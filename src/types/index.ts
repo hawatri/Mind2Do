@@ -13,6 +13,9 @@ export interface MindMapNode {
     url: string;
     name: string;
     id: string;
+    size?: number;
+    lastModified?: number;
+    filePath?: string; // Optional file path for better performance
   }[];
   formatting: {
     bold: boolean;

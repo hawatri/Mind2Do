@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Check, X, Plus, Image, FileText, ExternalLink } from 'lucide-react';
 import { MindMapNode as NodeType } from '../types';
+import { useFilePaths } from '../hooks/useFilePaths';
 
 interface MindMapNodeProps {
   node: NodeType;
@@ -31,6 +32,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
   isHandTool,
   zoom,
 }) => {
+  const { openFile, openBase64File, getFilePath } = useFilePaths();
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -77,6 +79,29 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
     }
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (isHandTool) {
+      e.stopPropagation();
+      return;
+    }
+    
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      if (e.target === nodeRef.current || (e.target as Element).closest('.node-handle')) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+        const rect = nodeRef.current!.getBoundingClientRect();
+        setDragOffset({
+          x: touch.clientX - rect.left,
+          y: touch.clientY - rect.top,
+        });
+        
+        onNodeSelect(node.id);
+      }
+    }
+  };
+
   const handleMouseMove = (e: MouseEvent) => {
     if (isDragging) {
       const container = nodeRef.current!.parentElement!.getBoundingClientRect();
@@ -91,13 +116,32 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
     setIsDragging(false);
   };
 
+  const handleTouchMove = (e: TouchEvent) => {
+    if (isDragging && e.touches.length === 1) {
+      const touch = e.touches[0];
+      const container = nodeRef.current!.parentElement!.getBoundingClientRect();
+      // Account for zoom level in drag calculations
+      const newX = (touch.clientX - container.left - dragOffset.x) / zoom;
+      const newY = (touch.clientY - container.top - dragOffset.y) / zoom;
+      onNodeMove(node.id, newX, newY);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('touchmove', handleTouchMove, { passive: false });
+      document.addEventListener('touchend', handleTouchEnd);
       return () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('touchend', handleTouchEnd);
       };
     }
   }, [isDragging, dragOffset]);
@@ -146,6 +190,44 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
     };
   };
 
+  const handleOpenMedia = async (media: any) => {
+    try {
+      // First check if we have a file path stored in the media object
+      if (media.filePath) {
+        const success = await openFile(media.filePath);
+        if (success) return;
+      }
+      
+      // Then check if we have a file path in our file paths storage
+      const filePath = getFilePath(media.id);
+      
+      if (filePath) {
+        // Use the stored file path
+        const success = await openFile(filePath.path);
+        if (success) return;
+      }
+
+      // Fallback to the improved base64 method for data URLs
+      if (media.url.startsWith('data:')) {
+        // Extract MIME type from the data URL
+        const mimeType = media.url.split(',')[0].split(':')[1].split(';')[0];
+        
+        // Use the improved base64 file opening method
+        const success = await openBase64File(media.url, media.name, mimeType);
+        if (success) return;
+        
+        // If that fails, show an error message
+        alert('Failed to open file. The file may be too large or corrupted.');
+      } else {
+        // Fallback for regular URLs
+        window.open(media.url, '_blank');
+      }
+    } catch (error) {
+      console.error('Error opening file:', error);
+      alert('Failed to open file. Please try again.');
+    }
+  };
+
   return (
     <div
       ref={nodeRef}
@@ -154,6 +236,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
       }`}
       style={{ left: node.x, top: node.y }}
       onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
     >
       <div
         className={`
@@ -182,6 +265,13 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
             onNodeSelect(node.id);
           }
         }}
+        onTouchEnd={(e) => {
+          e.stopPropagation();
+          if (isHandTool) {
+            return;
+          }
+          onNodeSelect(node.id);
+        }}
       >
         {/* Background overlay to hide connection lines */}
         <div className="absolute inset-0 bg-white dark:bg-gray-800 rounded-lg -z-10"></div>
@@ -189,6 +279,10 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
         <div className="flex items-start gap-3 mb-3">
           <button
             onClick={(e) => {
+              e.stopPropagation();
+              onNodeUpdate(node.id, { completed: !node.completed });
+            }}
+            onTouchEnd={(e) => {
               e.stopPropagation();
               onNodeUpdate(node.id, { completed: !node.completed });
             }}
@@ -205,26 +299,28 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
           
           <div className="flex-1 node-handle">
             {isEditingTitle ? (
-              <input
-                ref={titleInputRef}
-                type="text"
-                defaultValue={node.title}
-                className={`w-full bg-transparent border-none outline-none font-semibold text-lg ${getTextColorClass(node.formatting.textColor)}`}
-                onBlur={(e) => handleTitleSubmit(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleTitleSubmit((e.target as HTMLInputElement).value);
-                  } else if (e.key === 'Escape') {
-                    setIsEditingTitle(false);
-                  }
-                }}
-                onClick={(e) => e.stopPropagation()}
-              />
+                              <input
+                  ref={titleInputRef}
+                  type="text"
+                  defaultValue={node.title}
+                  className={`w-full bg-transparent border-none outline-none font-semibold text-lg ${getTextColorClass(node.formatting.textColor)}`}
+                  onBlur={(e) => handleTitleSubmit(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleTitleSubmit((e.target as HTMLInputElement).value);
+                    } else if (e.key === 'Escape') {
+                      setIsEditingTitle(false);
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                />
             ) : (
               <div
                 className={`${getTextColorClass(node.formatting.textColor)} break-words cursor-text font-semibold text-lg mb-2`}
                 style={getTextStyle()}
                 onDoubleClick={() => !isHandTool && setIsEditingTitle(true)}
+                onTouchEnd={() => !isHandTool && setIsEditingTitle(true)}
               >
                 {node.title}
               </div>
@@ -248,11 +344,13 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
                     }
                   }}
                   onClick={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
                 />
               ) : (
                 <div
                   className={`${getTextColorClass(node.formatting.textColor)} break-words cursor-text text-sm opacity-80 leading-relaxed`}
                   onDoubleClick={() => !isHandTool && setIsEditingDescription(true)}
+                  onTouchEnd={() => !isHandTool && setIsEditingDescription(true)}
                 >
                   {node.description}
                 </div>
@@ -262,6 +360,10 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
           
           <button
             onClick={(e) => {
+              e.stopPropagation();
+              onNodeDelete(node.id);
+            }}
+            onTouchEnd={(e) => {
               e.stopPropagation();
               onNodeDelete(node.id);
             }}
@@ -287,7 +389,11 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.open(media.url, '_blank');
+                      handleOpenMedia(media);
+                    }}
+                    onTouchEnd={(e) => {
+                      e.stopPropagation();
+                      handleOpenMedia(media);
                     }}
                     className="text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
                   >
@@ -295,6 +401,10 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
                   </button>
                   <button
                     onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveMedia(node.id, media.id);
+                    }}
+                    onTouchEnd={(e) => {
                       e.stopPropagation();
                       onRemoveMedia(node.id, media.id);
                     }}
@@ -320,6 +430,12 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
         
         <button
           onClick={(e) => {
+            e.stopPropagation();
+            if (!isHandTool) {
+              onNodeCreate(node.id, node.x + 250, node.y + 100);
+            }
+          }}
+          onTouchEnd={(e) => {
             e.stopPropagation();
             if (!isHandTool) {
               onNodeCreate(node.id, node.x + 250, node.y + 100);

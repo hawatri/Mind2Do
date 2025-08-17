@@ -7,6 +7,7 @@ import { FormattingToolbar } from './FormattingToolbar';
 import { FileOperations } from './FileOperations';
 import { ConnectionToolbar } from './ConnectionToolbar';
 import { DocumentViewer } from './DocumentViewer';
+import { useFilePaths } from '../hooks/useFilePaths';
 
 
 const createDefaultNode = (): MindMapNode => ({
@@ -31,6 +32,8 @@ const createDefaultNode = (): MindMapNode => ({
 });
 
 export const MindMap: React.FC = () => {
+  const { addFilePath, removeFilePath } = useFilePaths();
+  
   // Initialize with default node first
   const [nodes, setNodes] = useState<MindMapNode[]>(() => {
     try {
@@ -38,13 +41,31 @@ export const MindMap: React.FC = () => {
       if (stored) {
         const mindMapData = JSON.parse(stored);
         if (mindMapData.nodes && mindMapData.nodes.length > 0) {
-          return mindMapData.nodes.map((node: any) => ({ 
+          const loadedNodes = mindMapData.nodes.map((node: any) => ({ 
             ...node, 
             connections: node.connections || [],
             media: node.media || [],
             title: node.title || 'Untitled',
             description: node.description || 'Click to edit description'
           }));
+          
+          // Restore file paths for media that have them
+          loadedNodes.forEach((node: any) => {
+            node.media.forEach((media: any) => {
+              if (media.filePath) {
+                addFilePath({
+                  id: media.id,
+                  path: media.filePath,
+                  name: media.name,
+                  type: media.type,
+                  size: media.size,
+                  lastModified: media.lastModified
+                });
+              }
+            });
+          });
+          
+          return loadedNodes;
         }
       }
     } catch (error) {
@@ -203,10 +224,27 @@ export const MindMap: React.FC = () => {
       title: node.title || 'Untitled',
       description: node.description || 'Click to edit description'
     }));
+    
+    // Restore file paths for media that have them
+    nodesWithConnections.forEach(node => {
+      node.media.forEach(media => {
+        if (media.filePath) {
+          addFilePath({
+            id: media.id,
+            path: media.filePath,
+            name: media.name,
+            type: media.type,
+            size: media.size,
+            lastModified: media.lastModified
+          });
+        }
+      });
+    });
+    
     setNodes(nodesWithConnections);
     setSelectedNodeId(newNodes.length > 0 ? newNodes[0].id : null);
     setMultiSelectedNodes([]);
-  }, []);
+  }, [addFilePath]);
 
   const handleManualSave = useCallback(() => {
     saveToStorage();
@@ -398,14 +436,52 @@ export const MindMap: React.FC = () => {
     input.multiple = true;
     input.accept = type === 'image' ? 'image/*' : '*/*';
     
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const files = Array.from((e.target as HTMLInputElement).files || []);
       if (files.length > 0) {
-        const newMedia = files.map(file => ({
-          type,
-          url: URL.createObjectURL(file),
-          name: file.name,
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+        // Check file sizes (limit to 10MB per file to avoid localStorage issues)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        const oversizedFiles = files.filter(file => file.size > maxSize);
+        
+        if (oversizedFiles.length > 0) {
+          alert(`Some files are too large (max 10MB each):\n${oversizedFiles.map(f => f.name).join('\n')}\n\nFor better performance, consider using file paths instead of uploading large files.`);
+          return;
+        }
+        
+        const newMedia = await Promise.all(files.map(async (file) => {
+          const mediaId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+          
+          // Store the file path for better performance (if available)
+          const fileWithPath = file as File & { path?: string };
+          if (fileWithPath.path) {
+            addFilePath({
+              id: mediaId,
+              path: fileWithPath.path,
+              name: file.name,
+              type,
+              size: file.size,
+              lastModified: file.lastModified
+            });
+          }
+          
+          // Convert file to base64 for persistent storage (fallback)
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              resolve(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+          });
+          
+          return {
+            type,
+            url: base64, // Store as base64 data URL as fallback
+            name: file.name,
+            id: mediaId,
+            size: file.size,
+            lastModified: file.lastModified,
+            filePath: fileWithPath.path // Store file path in the media object too
+          };
         }));
         
         setNodes(prev => prev.map(node => 
@@ -420,7 +496,7 @@ export const MindMap: React.FC = () => {
     };
     
     input.click();
-  }, [selectedNodeId]);
+  }, [selectedNodeId, addFilePath]);
 
   const handleRemoveMedia = useCallback((nodeId: string, mediaId: string) => {
     setNodes(prev => prev.map(node => 
@@ -431,7 +507,10 @@ export const MindMap: React.FC = () => {
           }
         : node
     ));
-  }, []);
+    
+    // Also remove the file path from storage
+    removeFilePath(mediaId);
+  }, [removeFilePath]);
 
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
     if (isHandTool) {
@@ -455,6 +534,36 @@ export const MindMap: React.FC = () => {
   }, [isDraggingCanvas, dragStart]);
 
   const handleCanvasMouseUp = useCallback(() => {
+    setIsDraggingCanvas(false);
+  }, []);
+
+  // Touch event handlers for mobile devices
+  const handleCanvasTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      if (isHandTool) {
+        setIsDraggingCanvas(true);
+        setDragStart({ x: touch.clientX - canvasOffset.x, y: touch.clientY - canvasOffset.y });
+        e.preventDefault();
+      } else if (e.target === e.currentTarget) {
+        setSelectedNodeId(null);
+        setMultiSelectedNodes([]);
+      }
+    }
+  }, [isHandTool, canvasOffset]);
+
+  const handleCanvasTouchMove = useCallback((e: React.TouchEvent) => {
+    if (isDraggingCanvas && e.touches.length === 1) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      setCanvasOffset({
+        x: touch.clientX - dragStart.x,
+        y: touch.clientY - dragStart.y
+      });
+    }
+  }, [isDraggingCanvas, dragStart]);
+
+  const handleCanvasTouchEnd = useCallback(() => {
     setIsDraggingCanvas(false);
   }, []);
 
@@ -491,19 +600,20 @@ export const MindMap: React.FC = () => {
         onClearSelection={handleClearSelection}
       />
       
-      <div className="fixed bottom-4 left-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 flex items-center gap-2 border border-gray-200 dark:border-gray-700 z-50">
+      <div className="fixed bottom-4 left-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 flex items-center gap-1 sm:gap-2 border border-gray-200 dark:border-gray-700 z-50 max-w-[calc(100vw-2rem)]">
         <button
           onClick={() => setIsHandTool(!isHandTool)}
-          className={`p-2 rounded transition-colors ${
+          onTouchEnd={() => setIsHandTool(!isHandTool)}
+          className={`p-1.5 sm:p-2 rounded transition-colors ${
             isHandTool 
               ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' 
               : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
           }`}
           title={isHandTool ? "Switch to select mode" : "Switch to hand tool"}
         >
-          {isHandTool ? <Hand className="w-4 h-4" /> : <Move className="w-4 h-4" />}
+          {isHandTool ? <Hand className="w-3 h-3 sm:w-4 sm:h-4" /> : <Move className="w-3 h-3 sm:w-4 sm:h-4" />}
         </button>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
+        <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
           {isHandTool ? "Hand Tool" : "Select Tool"}
         </span>
         
@@ -511,37 +621,43 @@ export const MindMap: React.FC = () => {
         
         <button
           onClick={handleZoomIn}
-          className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
+          onTouchEnd={handleZoomIn}
+          className="p-1.5 sm:p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
           title="Zoom In (Scroll Up)"
         >
-          <span className="text-sm font-bold">+</span>
+          <span className="text-xs sm:text-sm font-bold">+</span>
         </button>
         
         <button
           onClick={handleZoomOut}
-          className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
+          onTouchEnd={handleZoomOut}
+          className="p-1.5 sm:p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
           title="Zoom Out (Scroll Down)"
         >
-          <span className="text-sm font-bold">−</span>
+          <span className="text-xs sm:text-sm font-bold">−</span>
         </button>
         
         <button
           onClick={handleResetZoom}
-          className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
+          onTouchEnd={handleResetZoom}
+          className="p-1.5 sm:p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
           title="Reset Zoom"
         >
-          <span className="text-xs">Reset</span>
+          <span className="text-xs hidden sm:inline">Reset</span>
+          <span className="text-xs sm:hidden">R</span>
         </button>
 
         <button
           onClick={handleCenterOnContent}
-          className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
+          onTouchEnd={handleCenterOnContent}
+          className="p-1.5 sm:p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
           title="Center on Content"
         >
-          <span className="text-xs">Center</span>
+          <span className="text-xs hidden sm:inline">Center</span>
+          <span className="text-xs sm:hidden">C</span>
         </button>
         
-        <span className="text-xs text-gray-500 dark:text-gray-400 px-2">
+        <span className="text-xs text-gray-500 dark:text-gray-400 px-2 hidden sm:inline">
           {Math.round(zoom * 100)}%
         </span>
       </div>
@@ -549,11 +665,12 @@ export const MindMap: React.FC = () => {
       {/* Document Viewer Button */}
       <button
         onClick={() => setIsDocumentViewerOpen(true)}
-        className="fixed top-20 right-0 p-3 bg-blue-500 hover:bg-blue-600 text-white rounded-l-lg shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out transform hover:translate-x-1 flex items-center gap-2 z-40 group"
+        onTouchEnd={() => setIsDocumentViewerOpen(true)}
+        className="fixed top-20 right-0 p-2 sm:p-3 bg-blue-500 hover:bg-blue-600 text-white rounded-l-lg shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out transform hover:translate-x-1 flex items-center gap-1 sm:gap-2 z-40 group"
         title="View Documents & Media"
       >
-        <FileText className="w-4 h-4" />
-        <span className="text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
+        <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
+        <span className="text-xs sm:text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
           Documents
         </span>
         <div className="absolute right-0 top-0 w-1 h-full bg-blue-400 rounded-l-full transition-all duration-300 group-hover:w-2"></div>
@@ -567,13 +684,17 @@ export const MindMap: React.FC = () => {
           onMouseMove={handleCanvasMouseMove}
           onMouseUp={handleCanvasMouseUp}
           onMouseLeave={handleCanvasMouseUp}
+          onTouchStart={handleCanvasTouchStart}
+          onTouchMove={handleCanvasTouchMove}
+          onTouchEnd={handleCanvasTouchEnd}
           onWheel={handleWheel}
           onWheelCapture={handleWheel}
           style={{ 
             minHeight: '100vh', 
             width: '200vw', 
             height: '200vh',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            touchAction: 'none'
           }}
         >
         <div
@@ -585,6 +706,12 @@ export const MindMap: React.FC = () => {
             height: '200vh'
           }}
           onMouseDown={(e) => {
+            if (!isHandTool && e.target === e.currentTarget) {
+              setSelectedNodeId(null);
+              setMultiSelectedNodes([]);
+            }
+          }}
+          onTouchStart={(e) => {
             if (!isHandTool && e.target === e.currentTarget) {
               setSelectedNodeId(null);
               setMultiSelectedNodes([]);
@@ -638,10 +765,35 @@ export const MindMap: React.FC = () => {
             setNodes(prev => [...prev, newNode]);
             setSelectedNodeId(newId);
           }}
-          className="fixed bottom-8 right-8 w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-40"
+          onTouchEnd={() => {
+            const newId = Date.now().toString();
+            const newNode: MindMapNode = {
+              id: newId,
+              title: 'New Task',
+              description: 'Click to edit description',
+              x: 100,
+              y: 100,
+              completed: false,
+              parentId: null,
+              children: [],
+              connections: [],
+              media: [],
+              formatting: {
+                bold: false,
+                italic: false,
+                underline: false,
+                strikethrough: false,
+                highlight: 'none',
+                textColor: 'default',
+              },
+            };
+            setNodes(prev => [...prev, newNode]);
+            setSelectedNodeId(newId);
+          }}
+          className="fixed bottom-8 right-4 sm:right-8 w-12 h-12 sm:w-14 sm:h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-40"
           title="Add new root task"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
 
         <button
@@ -660,10 +812,25 @@ export const MindMap: React.FC = () => {
               console.error('Failed to clear storage:', error);
             }
           }}
-          className="fixed bottom-8 right-24 w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-40"
+          onTouchEnd={() => {
+            // Clear everything and create new mindmap
+            const defaultNode = createDefaultNode();
+            setNodes([defaultNode]);
+            setSelectedNodeId(defaultNode.id);
+            setMultiSelectedNodes([]);
+            setCanvasOffset({ x: 0, y: 0 });
+            
+            // Clear localStorage
+            try {
+              localStorage.removeItem('mindmap-autosave');
+            } catch (error) {
+              console.error('Failed to clear storage:', error);
+            }
+          }}
+          className="fixed bottom-20 right-4 sm:bottom-8 sm:right-24 w-12 h-12 sm:w-14 sm:h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-40"
           title="Create new mindmap (clears everything)"
         >
-          <span className="text-sm font-semibold">New</span>
+          <span className="text-xs sm:text-sm font-semibold">New</span>
         </button>
         
         <div className="fixed bottom-4 right-4 text-xs text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 px-2 py-1 rounded shadow">

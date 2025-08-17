@@ -35,6 +35,7 @@ The project was built to solve several key challenges:
 - Text formatting (bold, italic, underline, strikethrough)
 - Color coding with highlight and text color options
 - Media attachment support (images and documents)
+- PDF file path management with automatic opening
 - External link integration
 
 ### User Experience
@@ -96,12 +97,20 @@ npm run build
 - Click the checkbox to mark tasks as complete
 - Use the formatting toolbar to style text content
 - Add media attachments for additional context
+- Manage PDF files with automatic path remembering
 - Export your mind map for sharing or backup
 
 ### Navigation
 - Use the hand tool to pan around the canvas
 - Ctrl+click to select multiple nodes
 - Use the file operations to save and load your work
+
+### PDF File Management
+- Add PDF files by uploading them or entering their file path
+- The application remembers the last opened PDF location
+- Quick access to recently opened PDFs from the document viewer
+- Automatic file path storage for better performance
+- Support for Windows file paths (e.g., C:\Users\username\Downloads\document.pdf)
 
 ## Project Structure
 
@@ -118,7 +127,8 @@ src/
 ├── contexts/           # React contexts
 │   └── ThemeContext.tsx # Theme management
 ├── hooks/              # Custom React hooks
-│   └── useAutoSave.ts  # Data persistence logic
+│   ├── useAutoSave.ts  # Data persistence logic
+│   └── useFilePaths.ts # File path management
 ├── types/              # TypeScript type definitions
 │   └── index.ts        # Core data structures
 └── App.tsx             # Main application component

@@ -51,56 +51,61 @@ export const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   if (!selectedNodeId) return null;
 
   return (
-    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 flex items-center gap-1 border border-gray-200 dark:border-gray-700 z-50">
+    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-1 sm:p-2 flex items-center gap-0.5 sm:gap-1 border border-gray-200 dark:border-gray-700 z-50 max-w-[calc(100vw-2rem)]">
       <button
         onClick={() => onFormatText('bold')}
-        className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+        onTouchEnd={() => onFormatText('bold')}
+        className={`p-1.5 sm:p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
           currentFormatting.bold ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
         }`}
         title="Bold"
       >
-        <Bold className="w-4 h-4" />
+        <Bold className="w-3 h-3 sm:w-4 sm:h-4" />
       </button>
       
       <button
         onClick={() => onFormatText('italic')}
-        className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+        onTouchEnd={() => onFormatText('italic')}
+        className={`p-1.5 sm:p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
           currentFormatting.italic ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
         }`}
         title="Italic"
       >
-        <Italic className="w-4 h-4" />
+        <Italic className="w-3 h-3 sm:w-4 sm:h-4" />
       </button>
       
       <button
         onClick={() => onFormatText('underline')}
-        className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+        onTouchEnd={() => onFormatText('underline')}
+        className={`p-1.5 sm:p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
           currentFormatting.underline ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
         }`}
         title="Underline"
       >
-        <Underline className="w-4 h-4" />
+        <Underline className="w-3 h-3 sm:w-4 sm:h-4" />
       </button>
       
       <button
         onClick={() => onFormatText('strikethrough')}
-        className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+        onTouchEnd={() => onFormatText('strikethrough')}
+        className={`p-1.5 sm:p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
           currentFormatting.strikethrough ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
         }`}
         title="Strikethrough"
       >
-        <Strikethrough className="w-4 h-4" />
+        <Strikethrough className="w-3 h-3 sm:w-4 sm:h-4" />
       </button>
       
-      <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
+      <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-0.5 sm:mx-1" />
       
       <div className="relative">
         <button
           onClick={() => setShowColorPicker(!showColorPicker)}
-          className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-400"
+          onTouchEnd={() => setShowColorPicker(!showColorPicker)}
+          className="p-1.5 sm:p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-400"
           title="Highlight"
         >
-          <Palette className="w-4 h-4" />
+          <Palette className="w-3 h-3 sm:w-4 sm:h-4" />
         </button>
         
         {showColorPicker && (
@@ -123,10 +128,10 @@ export const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
       <div className="relative">
         <button
           onClick={() => setShowTextColorPicker(!showTextColorPicker)}
-          className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-400"
+          className="p-1.5 sm:p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-400"
           title="Text Color"
         >
-          <Type className="w-4 h-4" />
+          <Type className="w-3 h-3 sm:w-4 sm:h-4" />
         </button>
         
         {showTextColorPicker && (
@@ -148,22 +153,22 @@ export const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
         )}
       </div>
       
-      <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
+      <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-0.5 sm:mx-1" />
       
       <button
         onClick={() => onAddMedia('image')}
-        className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-400"
+        className="p-1.5 sm:p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-400"
         title="Add Image"
       >
-        <Image className="w-4 h-4" />
+        <Image className="w-3 h-3 sm:w-4 sm:h-4" />
       </button>
       
       <button
         onClick={() => onAddMedia('document')}
-        className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-400"
+        className="p-1.5 sm:p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-400"
         title="Add Document"
       >
-        <FileText className="w-4 h-4" />
+        <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
       </button>
     </div>
   );
