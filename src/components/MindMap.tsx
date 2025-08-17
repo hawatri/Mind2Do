@@ -1,11 +1,12 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Plus, Hand, Move } from 'lucide-react';
+import { Plus, Hand, Move, FileText } from 'lucide-react';
 import { MindMapNode, HighlightColor, TextColor } from '../types';
 import { MindMapNode as NodeComponent } from './MindMapNode';
 import { ConnectionLines } from './ConnectionLines';
 import { FormattingToolbar } from './FormattingToolbar';
 import { FileOperations } from './FileOperations';
 import { ConnectionToolbar } from './ConnectionToolbar';
+import { DocumentViewer } from './DocumentViewer';
 
 
 const createDefaultNode = (): MindMapNode => ({
@@ -74,6 +75,7 @@ export const MindMap: React.FC = () => {
   const [isHandTool, setIsHandTool] = useState(false);
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isDocumentViewerOpen, setIsDocumentViewerOpen] = useState(false);
 
   // Manual save function
   const saveToStorage = useCallback(() => {
@@ -543,6 +545,19 @@ export const MindMap: React.FC = () => {
           {Math.round(zoom * 100)}%
         </span>
       </div>
+
+      {/* Document Viewer Button */}
+      <button
+        onClick={() => setIsDocumentViewerOpen(true)}
+        className="fixed top-20 right-0 p-3 bg-blue-500 hover:bg-blue-600 text-white rounded-l-lg shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out transform hover:translate-x-1 flex items-center gap-2 z-40 group"
+        title="View Documents & Media"
+      >
+        <FileText className="w-4 h-4" />
+        <span className="text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
+          Documents
+        </span>
+        <div className="absolute right-0 top-0 w-1 h-full bg-blue-400 rounded-l-full transition-all duration-300 group-hover:w-2"></div>
+      </button>
       
               <div
           className={`mindmap-container relative w-full h-full bg-gray-50 dark:bg-gray-900 overflow-hidden ${
@@ -655,6 +670,13 @@ export const MindMap: React.FC = () => {
           Hold Ctrl/Cmd + Click to select multiple nodes
         </div>
       </div>
+
+      {/* Document Viewer */}
+      <DocumentViewer
+        isOpen={isDocumentViewerOpen}
+        onClose={() => setIsDocumentViewerOpen(false)}
+        selectedNode={selectedNodeId ? nodes.find(n => n.id === selectedNodeId) || null : null}
+      />
     </div>
   );
 };
