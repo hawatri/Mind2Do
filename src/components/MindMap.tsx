@@ -30,18 +30,41 @@ const createDefaultNode = (): MindMapNode => ({
 });
 
 export const MindMap: React.FC = () => {
-  const { saveToStorage, loadFromStorage } = useAutoSave([]);
-  
+  // Initialize with default node first
   const [nodes, setNodes] = useState<MindMapNode[]>(() => {
-    const savedNodes = loadFromStorage();
-    return savedNodes && savedNodes.length > 0 
-      ? savedNodes.map(node => ({ ...node, connections: node.connections || [] }))
-      : [createDefaultNode()];
+    try {
+      const stored = localStorage.getItem('mindmap-autosave');
+      if (stored) {
+        const mindMapData = JSON.parse(stored);
+        if (mindMapData.nodes && mindMapData.nodes.length > 0) {
+          return mindMapData.nodes.map((node: any) => ({ 
+            ...node, 
+            connections: node.connections || [],
+            media: node.media || [],
+            title: node.title || 'Untitled',
+            description: node.description || 'Click to edit description'
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load from storage:', error);
+    }
+    return [createDefaultNode()];
   });
   
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(() => {
-    const savedNodes = loadFromStorage();
-    return savedNodes && savedNodes.length > 0 ? savedNodes[0].id : '1';
+    try {
+      const stored = localStorage.getItem('mindmap-autosave');
+      if (stored) {
+        const mindMapData = JSON.parse(stored);
+        if (mindMapData.nodes && mindMapData.nodes.length > 0) {
+          return mindMapData.nodes[0].id;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load from storage:', error);
+    }
+    return '1';
   });
 
   const [multiSelectedNodes, setMultiSelectedNodes] = useState<string[]>([]);
@@ -51,15 +74,20 @@ export const MindMap: React.FC = () => {
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  // Update auto-save hook with current nodes
-  const autoSaveHook = useAutoSave(nodes);
+  // Auto-save hook - initialize after state
+  const { saveToStorage } = useAutoSave(nodes);
 
   const handleLoadMindMap = useCallback((newNodes: MindMapNode[]) => {
+    if (!newNodes || !Array.isArray(newNodes)) {
+      console.error('Invalid nodes data:', newNodes);
+      return;
+    }
+    
     const nodesWithConnections = newNodes.map(node => ({ 
       ...node, 
       connections: node.connections || [],
       media: node.media || [],
-      title: node.title || node.text || 'Untitled',
+      title: node.title || 'Untitled',
       description: node.description || 'Click to edit description'
     }));
     setNodes(nodesWithConnections);
@@ -68,7 +96,7 @@ export const MindMap: React.FC = () => {
   }, []);
 
   const handleManualSave = useCallback(() => {
-    autoSaveHook.saveToStorage();
+    saveToStorage();
     // Show a brief success indicator
     const button = document.querySelector('[title="Save to browser storage"]');
     if (button) {
@@ -78,7 +106,7 @@ export const MindMap: React.FC = () => {
         button.setAttribute('title', originalTitle || 'Save to browser storage');
       }, 2000);
     }
-  }, [autoSaveHook]);
+  }, [saveToStorage]);
 
   const handleNodeSelect = useCallback((id: string) => {
     setSelectedNodeId(id);
@@ -167,13 +195,15 @@ export const MindMap: React.FC = () => {
     const newId = Date.now().toString();
     const newNode: MindMapNode = {
       id: newId,
-      text: 'New Task',
+      title: 'New Task',
+      description: 'Click to edit description',
       x,
       y,
       completed: false,
       parentId,
       children: [],
       connections: [],
+      media: [],
       formatting: {
         bold: false,
         italic: false,
@@ -184,15 +214,11 @@ export const MindMap: React.FC = () => {
       },
     };
     
-    setNodes(prev => [
-      ...prev,
-      newNode,
-      ...prev.map(node => 
-        node.id === parentId 
-          ? { ...node, children: [...node.children, newId] }
-          : node
-      ).slice(1) // Remove the original parent from the front since we're adding the updated one
-    ]);
+    setNodes(prev => prev.map(node => 
+      node.id === parentId 
+        ? { ...node, children: [...node.children, newId] }
+        : node
+    ).concat(newNode));
     
     setSelectedNodeId(newId);
   }, []);
