@@ -70,6 +70,7 @@ export const MindMap: React.FC = () => {
   const [multiSelectedNodes, setMultiSelectedNodes] = useState<string[]>([]);
 
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
   const [isHandTool, setIsHandTool] = useState(false);
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -105,6 +106,87 @@ export const MindMap: React.FC = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [saveToStorage]);
+
+  // Global wheel event prevention for the entire mind map area
+  useEffect(() => {
+    const handleGlobalWheel = (e: WheelEvent) => {
+      // Only prevent scroll if we're over the mind map area
+      const target = e.target as Element;
+      if (target && target.closest('.mindmap-container')) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    // Use passive: false to ensure we can prevent default
+    window.addEventListener('wheel', handleGlobalWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleGlobalWheel);
+  }, []);
+
+  // Zoom functions
+  const handleZoomIn = useCallback(() => {
+    setZoom(prev => {
+      const newZoom = Math.round((prev + 0.1) * 10) / 10; // Exact 10% increase
+      return Math.min(newZoom, 3); // Max zoom 3x
+    });
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoom(prev => {
+      const newZoom = Math.round((prev - 0.1) * 10) / 10; // Exact 10% decrease
+      return Math.max(newZoom, 0.3); // Min zoom 0.3x
+    });
+  }, []);
+
+  const handleResetZoom = useCallback(() => {
+    setZoom(1);
+    setCanvasOffset({ x: 0, y: 0 });
+  }, []);
+
+  // Center on content
+  const handleCenterOnContent = useCallback(() => {
+    if (nodes.length > 0) {
+      // Calculate the center of all nodes
+      const minX = Math.min(...nodes.map(node => node.x));
+      const maxX = Math.max(...nodes.map(node => node.x));
+      const minY = Math.min(...nodes.map(node => node.y));
+      const maxY = Math.max(...nodes.map(node => node.y));
+      
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      
+      // Calculate offset to center the content
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      setCanvasOffset({
+        x: viewportWidth / 2 - centerX * zoom,
+        y: viewportHeight / 2 - centerY * zoom
+      });
+    }
+  }, [nodes, zoom]);
+
+  // Handle scroll wheel zoom
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault(); // Prevent default scroll
+    e.stopPropagation(); // Stop event bubbling
+    
+    // Exact 10% zoom change
+    if (e.deltaY > 0) {
+      setZoom(prev => {
+        const newZoom = Math.round((prev - 0.1) * 10) / 10;
+        return Math.max(newZoom, 0.3);
+      });
+    } else {
+      setZoom(prev => {
+        const newZoom = Math.round((prev + 0.1) * 10) / 10;
+        return Math.min(newZoom, 3);
+      });
+    }
+    
+    return false; // Additional prevention
+  }, []);
 
   const handleLoadMindMap = useCallback((newNodes: MindMapNode[]) => {
     if (!newNodes || !Array.isArray(newNodes)) {
@@ -422,22 +504,68 @@ export const MindMap: React.FC = () => {
         <span className="text-xs text-gray-500 dark:text-gray-400">
           {isHandTool ? "Hand Tool" : "Select Tool"}
         </span>
+        
+        <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
+        
+        <button
+          onClick={handleZoomIn}
+          className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
+          title="Zoom In (Scroll Up)"
+        >
+          <span className="text-sm font-bold">+</span>
+        </button>
+        
+        <button
+          onClick={handleZoomOut}
+          className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
+          title="Zoom Out (Scroll Down)"
+        >
+          <span className="text-sm font-bold">−</span>
+        </button>
+        
+        <button
+          onClick={handleResetZoom}
+          className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
+          title="Reset Zoom"
+        >
+          <span className="text-xs">Reset</span>
+        </button>
+
+        <button
+          onClick={handleCenterOnContent}
+          className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 transition-colors"
+          title="Center on Content"
+        >
+          <span className="text-xs">Center</span>
+        </button>
+        
+        <span className="text-xs text-gray-500 dark:text-gray-400 px-2">
+          {Math.round(zoom * 100)}%
+        </span>
       </div>
       
-      <div
-        className={`relative w-full h-full bg-gray-50 dark:bg-gray-900 overflow-hidden ${
-          isHandTool ? 'cursor-grab' : 'cursor-default'
-        } ${isDraggingCanvas ? 'cursor-grabbing' : ''}`}
-        onMouseDown={handleCanvasMouseDown}
-        onMouseMove={handleCanvasMouseMove}
-        onMouseUp={handleCanvasMouseUp}
-        onMouseLeave={handleCanvasMouseUp}
-        style={{ minHeight: '100vh', width: '200vw', height: '200vh' }}
-      >
+              <div
+          className={`mindmap-container relative w-full h-full bg-gray-50 dark:bg-gray-900 overflow-hidden ${
+            isHandTool ? 'cursor-grab' : 'cursor-default'
+          } ${isDraggingCanvas ? 'cursor-grabbing' : ''}`}
+          onMouseDown={handleCanvasMouseDown}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseUp={handleCanvasMouseUp}
+          onMouseLeave={handleCanvasMouseUp}
+          onWheel={handleWheel}
+          onWheelCapture={handleWheel}
+          style={{ 
+            minHeight: '100vh', 
+            width: '200vw', 
+            height: '200vh',
+            overflow: 'hidden'
+          }}
+        >
         <div
           className="relative"
           style={{
-            transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px)`,
+            transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${zoom})`,
+            transformOrigin: 'center',
             width: '200vw',
             height: '200vh'
           }}
@@ -464,6 +592,7 @@ export const MindMap: React.FC = () => {
               onNodeMove={handleNodeMove}
               onRemoveMedia={handleRemoveMedia}
               isHandTool={isHandTool}
+              zoom={zoom}
             />
           ))}
         </div>
@@ -498,6 +627,28 @@ export const MindMap: React.FC = () => {
           title="Add new root task"
         >
           <Plus className="w-6 h-6" />
+        </button>
+
+        <button
+          onClick={() => {
+            // Clear everything and create new mindmap
+            const defaultNode = createDefaultNode();
+            setNodes([defaultNode]);
+            setSelectedNodeId(defaultNode.id);
+            setMultiSelectedNodes([]);
+            setCanvasOffset({ x: 0, y: 0 });
+            
+            // Clear localStorage
+            try {
+              localStorage.removeItem('mindmap-autosave');
+            } catch (error) {
+              console.error('Failed to clear storage:', error);
+            }
+          }}
+          className="fixed bottom-8 right-24 w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-40"
+          title="Create new mindmap (clears everything)"
+        >
+          <span className="text-sm font-semibold">New</span>
         </button>
         
         <div className="fixed bottom-4 right-4 text-xs text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 px-2 py-1 rounded shadow">

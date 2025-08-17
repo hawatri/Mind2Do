@@ -14,6 +14,7 @@ interface MindMapNodeProps {
   onNodeMove: (id: string, x: number, y: number) => void;
   onRemoveMedia: (nodeId: string, mediaId: string) => void;
   isHandTool: boolean;
+  zoom: number;
 }
 
 export const MindMapNode: React.FC<MindMapNodeProps> = ({
@@ -28,6 +29,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
   onNodeMove,
   onRemoveMedia,
   isHandTool,
+  zoom,
 }) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -78,8 +80,9 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
   const handleMouseMove = (e: MouseEvent) => {
     if (isDragging) {
       const container = nodeRef.current!.parentElement!.getBoundingClientRect();
-      const newX = e.clientX - container.left - dragOffset.x;
-      const newY = e.clientY - container.top - dragOffset.y;
+      // Account for zoom level in drag calculations
+      const newX = (e.clientX - container.left - dragOffset.x) / zoom;
+      const newY = (e.clientY - container.top - dragOffset.y) / zoom;
       onNodeMove(node.id, newX, newY);
     }
   };
@@ -113,11 +116,11 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
 
   const getHighlightClass = (highlight: string) => {
     switch (highlight) {
-      case 'yellow': return 'bg-yellow-50 dark:bg-yellow-900/20';
-      case 'green': return 'bg-green-50 dark:bg-green-900/20';
-      case 'blue': return 'bg-blue-50 dark:bg-blue-900/20';
-      case 'pink': return 'bg-pink-50 dark:bg-pink-900/20';
-      case 'purple': return 'bg-purple-50 dark:bg-purple-900/20';
+      case 'yellow': return 'bg-yellow-100 dark:bg-yellow-900/30';
+      case 'green': return 'bg-green-200 dark:bg-green-900/30';
+      case 'blue': return 'bg-blue-200 dark:bg-blue-900/30';
+      case 'pink': return 'bg-pink-200 dark:bg-pink-900/30';
+      case 'purple': return 'bg-purple-200 dark:bg-purple-900/30';
       default: return '';
     }
   };
@@ -146,7 +149,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
   return (
     <div
       ref={nodeRef}
-      className={`absolute select-none ${isDragging ? 'z-50' : 'z-10'} ${
+      className={`absolute select-none ${isDragging ? 'z-50' : 'z-30'} ${
         isHandTool ? 'pointer-events-none' : 'cursor-move'
       }`}
       style={{ left: node.x, top: node.y }}
@@ -154,7 +157,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
     >
       <div
         className={`
-          min-w-48 max-w-80 p-4 rounded-lg shadow-lg border-2 transition-all duration-200 pointer-events-auto
+          min-w-64 max-w-96 p-4 rounded-lg shadow-lg border-2 transition-all duration-200 pointer-events-auto
           ${isSelected 
             ? 'border-blue-500 shadow-blue-100 dark:shadow-blue-900/50' 
             : isMultiSelected
@@ -162,10 +165,11 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
             : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
           }
           ${node.completed 
-            ? 'bg-green-50 dark:bg-green-900/20' 
+            ? 'bg-green-100 dark:bg-green-900/30' 
             : 'bg-white dark:bg-gray-800'
           }
           ${getHighlightClass(node.formatting.highlight)}
+          relative
         `}
         onClick={(e) => {
           e.stopPropagation();
@@ -179,6 +183,9 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
           }
         }}
       >
+        {/* Background overlay to hide connection lines */}
+        <div className="absolute inset-0 bg-white dark:bg-gray-800 rounded-lg -z-10"></div>
+        
         <div className="flex items-start gap-3 mb-3">
           <button
             onClick={(e) => {
@@ -223,31 +230,34 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
               </div>
             )}
             
-            {isEditingDescription ? (
-              <textarea
-                ref={descriptionInputRef}
-                defaultValue={node.description}
-                className={`w-full bg-transparent border-none outline-none resize-none text-sm ${getTextColorClass(node.formatting.textColor)} opacity-80`}
-                rows={2}
-                onBlur={(e) => handleDescriptionSubmit(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleDescriptionSubmit((e.target as HTMLTextAreaElement).value);
-                  } else if (e.key === 'Escape') {
-                    setIsEditingDescription(false);
-                  }
-                }}
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <div
-                className={`${getTextColorClass(node.formatting.textColor)} break-words cursor-text text-sm opacity-80`}
-                onDoubleClick={() => !isHandTool && setIsEditingDescription(true)}
-              >
-                {node.description}
-              </div>
-            )}
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-gray-50 dark:bg-gray-700/30">
+              {isEditingDescription ? (
+                <textarea
+                  ref={descriptionInputRef}
+                  defaultValue={node.description}
+                  className={`w-full bg-transparent border-none outline-none resize-none text-sm ${getTextColorClass(node.formatting.textColor)} opacity-80`}
+                  rows={4}
+                  placeholder="Click to edit description..."
+                  onBlur={(e) => handleDescriptionSubmit(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleDescriptionSubmit((e.target as HTMLTextAreaElement).value);
+                    } else if (e.key === 'Escape') {
+                      setIsEditingDescription(false);
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <div
+                  className={`${getTextColorClass(node.formatting.textColor)} break-words cursor-text text-sm opacity-80 leading-relaxed`}
+                  onDoubleClick={() => !isHandTool && setIsEditingDescription(true)}
+                >
+                  {node.description}
+                </div>
+              )}
+            </div>
           </div>
           
           <button
@@ -315,12 +325,12 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
               onNodeCreate(node.id, node.x + 250, node.y + 100);
             }
           }}
-          className={`w-full py-2 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-500 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center gap-1 ${
+          className={`w-full py-3 rounded border-2 border-dashed border-gray-400 dark:border-gray-600 hover:border-blue-500 text-gray-700 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center gap-2 font-medium ${
             isHandTool ? 'pointer-events-none opacity-50' : ''
           }`}
         >
-          <Plus className="w-3 h-3" />
-          <span className="text-xs">Add child</span>
+          <Plus className="w-4 h-4" />
+          <span className="text-sm font-semibold">Add Child</span>
         </button>
       </div>
     </div>

@@ -66,7 +66,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ nodes }) => {
 
   return (
     <svg
-      className="absolute inset-0 pointer-events-none z-0"
+      className="absolute inset-0 pointer-events-none z-[-10]"
       style={{
         left: bounds.minX,
         top: bounds.minY,

@@ -1,3 +1,32 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Remove all scroll bars */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* Ensure body and html have no overflow */
+html, body {
+  overflow: hidden;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Mind map specific overflow control */
+.mindmap-container {
+  overflow: hidden !important;
+}
+
+/* Remove any potential scroll from the main app */
+#root {
+  overflow: hidden;
+  height: 100vh;
+}
