@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Plus, Hand, Move } from 'lucide-react';
 import { MindMapNode, HighlightColor, TextColor } from '../types';
 import { MindMapNode as NodeComponent } from './MindMapNode';
@@ -6,7 +6,7 @@ import { ConnectionLines } from './ConnectionLines';
 import { FormattingToolbar } from './FormattingToolbar';
 import { FileOperations } from './FileOperations';
 import { ConnectionToolbar } from './ConnectionToolbar';
-import { useAutoSave } from '../hooks/useAutoSave';
+
 
 const createDefaultNode = (): MindMapNode => ({
   id: '1',
@@ -74,8 +74,37 @@ export const MindMap: React.FC = () => {
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  // Auto-save hook - initialize after state
-  const { saveToStorage } = useAutoSave(nodes);
+  // Manual save function
+  const saveToStorage = useCallback(() => {
+    try {
+      const mindMapData = {
+        nodes,
+        version: '1.0.0',
+        createdAt: localStorage.getItem('mindmap-autosave') 
+          ? JSON.parse(localStorage.getItem('mindmap-autosave')!).createdAt 
+          : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      localStorage.setItem('mindmap-autosave', JSON.stringify(mindMapData));
+    } catch (error) {
+      console.error('Failed to save to localStorage:', error);
+    }
+  }, [nodes]);
+
+  // Auto-save effect
+  useEffect(() => {
+    const interval = setInterval(saveToStorage, 5000); // Auto-save every 5 seconds
+    return () => clearInterval(interval);
+  }, [saveToStorage]);
+
+  // Save on page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveToStorage();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saveToStorage]);
 
   const handleLoadMindMap = useCallback((newNodes: MindMapNode[]) => {
     if (!newNodes || !Array.isArray(newNodes)) {
@@ -378,7 +407,7 @@ export const MindMap: React.FC = () => {
         onClearSelection={handleClearSelection}
       />
       
-      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 ml-32 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 flex items-center gap-2 border border-gray-200 dark:border-gray-700 z-50">
+      <div className="fixed bottom-4 left-4 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-2 flex items-center gap-2 border border-gray-200 dark:border-gray-700 z-50">
         <button
           onClick={() => setIsHandTool(!isHandTool)}
           className={`p-2 rounded transition-colors ${

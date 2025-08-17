@@ -11,6 +11,7 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ nodes }) => {
     new Map(nodes.map(node => [node.id, node])), 
     [nodes]
   );
+  
   // Memoize connections for better performance
   const connections = React.useMemo(() => {
     // Parent-child connections
@@ -47,15 +48,21 @@ export const ConnectionLines: React.FC<ConnectionLinesProps> = ({ nodes }) => {
     return [...parentChildConnections, ...customConnections];
   }, [nodes, nodeMap]);
 
-  if (connections.length === 0) return null;
-
+  // Memoize bounds calculation - must be called before any early returns
   const bounds = React.useMemo(() => {
+    if (connections.length === 0) {
+      return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    }
+    
     const minX = Math.min(...connections.map(c => Math.min(c!.from.x, c!.to.x))) - 10;
     const minY = Math.min(...connections.map(c => Math.min(c!.from.y, c!.to.y))) - 10;
     const maxX = Math.max(...connections.map(c => Math.max(c!.from.x, c!.to.x))) + 10;
     const maxY = Math.max(...connections.map(c => Math.max(c!.from.y, c!.to.y))) + 10;
     return { minX, minY, maxX, maxY };
   }, [connections]);
+
+  // Early return after all hooks have been called
+  if (connections.length === 0) return null;
 
   return (
     <svg
