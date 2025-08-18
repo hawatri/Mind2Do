@@ -439,12 +439,12 @@ export const MindMap: React.FC = () => {
     input.onchange = async (e) => {
       const files = Array.from((e.target as HTMLInputElement).files || []);
       if (files.length > 0) {
-        // Check file sizes (limit to 10MB per file to avoid localStorage issues)
-        const maxSize = 10 * 1024 * 1024; // 10MB
+        // Check file sizes (limit to 500MB per file to avoid localStorage issues)
+        const maxSize = 500 * 1024 * 1024; // 500MB
         const oversizedFiles = files.filter(file => file.size > maxSize);
         
         if (oversizedFiles.length > 0) {
-          alert(`Some files are too large (max 10MB each):\n${oversizedFiles.map(f => f.name).join('\n')}\n\nFor better performance, consider using file paths instead of uploading large files.`);
+          alert(`Some files are too large (max 500MB each):\n${oversizedFiles.map(f => f.name).join('\n')}\n\nFor better performance, consider using file paths instead of uploading large files.`);
           return;
         }
         
