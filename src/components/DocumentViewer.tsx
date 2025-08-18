@@ -228,7 +228,14 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
               {/* Media Files */}
               {selectedNode.media.length > 0 ? (
-                <div className="space-y-3">
+                <div
+                className="space-y-3 media-list"
+                style={{
+                overflowY: 'auto',
+                                  maxHeight: '700px', // Adjust this value as needed
+                                  // Inline styles to re-enable scrollbars
+                                  WebkitOverflowScrolling: 'touch',
+                }}>
                   <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3">
                     Attachments ({selectedNode.media.length})
                   </h4>
