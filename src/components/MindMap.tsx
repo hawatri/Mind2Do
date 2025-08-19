@@ -702,7 +702,7 @@ export const MindMap: React.FC = () => {
           style={{
             transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px) scale(${zoom})`,
             transformOrigin: '0 0', // Set origin to top-left for more predictable translation behavior
-            transition: 'transform 0.3s ease-out', // Add transition for smooth zoom/pan
+            transition: 'transform 0.1s ease-out', // Add transition for smooth zoom/pan
             width: '200vw',
             height: '200vh'
           }}

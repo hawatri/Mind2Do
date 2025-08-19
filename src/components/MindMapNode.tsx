@@ -427,7 +427,24 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
             ))}
           </div>
         )}
-        
+        <div className="flex flex-row items-center gap-2 mt-3">
+ <button
+ onClick={(e) => {
+ e.stopPropagation();
+            // TODO: Implement AI Suggestion logic
+ }}
+ onTouchEnd={(e) => {
+ e.stopPropagation();
+            // TODO: Implement AI Suggestion logic
+ }}
+ className={`flex-1 py-2 rounded border-2 border-dashed border-gray-400 dark:border-gray-600 hover:border-blue-500 text-gray-700 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center gap-2 font-medium ${
+ isHandTool ? 'pointer-events-none opacity-50' : ''
+ }`}
+ >
+ <FileText className="w-4 h-4" /> {/* Using FileText icon for now */}
+ <span className="text-sm font-semibold">AI Suggestion</span>
+ </button>
+
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -441,13 +458,14 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
               onNodeCreate(node.id, node.x + 250, node.y + 100);
             }
           }}
-          className={`w-full py-3 rounded border-2 border-dashed border-gray-400 dark:border-gray-600 hover:border-blue-500 text-gray-700 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center gap-2 font-medium ${
+className={`flex-1 py-2 rounded border-2 border-dashed border-gray-400 dark:border-gray-600 hover:border-blue-500 text-gray-700 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center gap-2 font-medium ${
             isHandTool ? 'pointer-events-none opacity-50' : ''
           }`}
         >
           <Plus className="w-4 h-4" />
           <span className="text-sm font-semibold">Add Child</span>
         </button>
+        </div>
       </div>
     </div>
   );
