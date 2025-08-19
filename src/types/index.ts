@@ -9,7 +9,7 @@ export interface MindMapNode {
   children: string[];
   connections: string[];
   media: {
-    type: 'image' | 'document';
+    type: 'image' | 'document' | 'link';
     url: string;
     name: string;
     id: string;
@@ -18,6 +18,7 @@ export interface MindMapNode {
     filePath?: string; // Optional file path for better performance
     mimeType?: string;
     extractedText?: string;
+    linkType?: 'youtube' | 'video' | 'audio' | 'other'; // For link media types
   }[];
   chat?: { role: 'user' | 'assistant' | 'system'; content: string }[];
   formatting: {

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, FileText, Image, Download, ExternalLink, File, MessageCircle } from 'lucide-react';
+import { X, FileText, Image, Download, ExternalLink, File, MessageCircle, Play, Youtube, Music, Video, Link } from 'lucide-react';
 import { MindMapNode } from '../types';
+import { MediaPlayer } from './MediaPlayer';
 import { useFilePaths } from '../hooks/useFilePaths';
 import * as pdfjsLib from 'pdfjs-dist';
 import { createWorker } from 'tesseract.js';
@@ -21,6 +22,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 }) => {
   const [selectedMedia, setSelectedMedia] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'media' | 'chat'>('media');
+  const [selectedMediaForPlayer, setSelectedMediaForPlayer] = useState<any>(null);
   const [model, setModel] = useState<string>('deepseek-r1:1.5b');
   const [systemPrompt] = useState<string>('You are a helpful assistant for a mindmap/todo app. Keep responses concise.');
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant' | 'system'; content: string }[]>(selectedNode?.chat || []);
@@ -39,7 +41,12 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const { lastOpenedPdf, openFile, openBase64File, getFilePath } = useFilePaths();
 
   const handleMediaClick = (mediaId: string) => {
-    setSelectedMedia(selectedMedia === mediaId ? null : mediaId);
+    const media = selectedNode?.media.find(m => m.id === mediaId);
+    if (media?.type === 'link') {
+      setSelectedMediaForPlayer(media);
+    } else {
+      setSelectedMedia(selectedMedia === mediaId ? null : mediaId);
+    }
   };
 
   const handleDownload = (media: any) => {
@@ -83,6 +90,40 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getMediaIcon = (media: any) => {
+    if (media.type === 'image') {
+      return <Image className="w-5 h-5 text-blue-600 dark:text-blue-400 transform transition-all duration-300 hover:scale-110 hover:rotate-3" />;
+    } else if (media.type === 'document') {
+      return <FileText className="w-5 h-5 text-green-600 dark:text-green-400 transform transition-all duration-300 hover:scale-110 hover:rotate-3" />;
+    } else if (media.type === 'link') {
+      switch (media.linkType) {
+        case 'youtube':
+          return <Youtube className="w-5 h-5 text-red-500 transform transition-all duration-300 hover:scale-110 hover:rotate-3" />;
+        case 'video':
+          return <Video className="w-5 h-5 text-blue-500 transform transition-all duration-300 hover:scale-110 hover:rotate-3" />;
+        case 'audio':
+          return <Music className="w-5 h-5 text-green-500 transform transition-all duration-300 hover:scale-110 hover:rotate-3" />;
+        default:
+          return <Link className="w-5 h-5 text-gray-500 transform transition-all duration-300 hover:scale-110 hover:rotate-3" />;
+      }
+    }
+    return <FileText className="w-5 h-5 text-gray-500 transform transition-all duration-300 hover:scale-110 hover:rotate-3" />;
+  };
+
+  const getMediaTypeLabel = (media: any) => {
+    if (media.type === 'image') return 'Image File';
+    if (media.type === 'document') return 'Document File';
+    if (media.type === 'link') {
+      switch (media.linkType) {
+        case 'youtube': return 'YouTube Video';
+        case 'video': return 'Video Link';
+        case 'audio': return 'Audio Link';
+        default: return 'Media Link';
+      }
+    }
+    return 'File';
   };
 
   const handleOpenInNewTab = async (media: any) => {
@@ -431,17 +472,13 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                      >
                       {/* Media Header */}
                       <div className="flex items-center gap-3 mb-3">
-                                                 {media.type === 'image' ? (
-                           <Image className="w-5 h-5 text-blue-600 dark:text-blue-400 transform transition-all duration-300 hover:scale-110 hover:rotate-3" />
-                         ) : (
-                           <FileText className="w-5 h-5 text-green-600 dark:text-green-400 transform transition-all duration-300 hover:scale-110 hover:rotate-3" />
-                         )}
+                        {getMediaIcon(media)}
                                                  <div className="flex-1 min-w-0">
                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                              {media.name}
                            </p>
                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                             {media.type === 'image' ? 'Image File' : 'Document File'}
+                             {getMediaTypeLabel(media)}
                              {media.size && ` • ${formatFileSize(media.size)}`}
                            </p>
                          </div>
@@ -461,7 +498,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                       )}
 
                       {/* File Size Warning */}
-                      {media.size && media.size > 5 * 1024 * 1024 && (
+                      {media.size && media.size > 5 * 1024 * 1024 && media.type !== 'link' && (
                         <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-700 dark:text-yellow-300">
                           ⚠️ Large file ({formatFileSize(media.size)}). Opening may be slow. Consider using file paths for better performance.
                         </div>
@@ -469,15 +506,35 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
                       {/* Action Buttons */}
                       <div className="flex gap-2">
+                        {media.type === 'link' && (
+                          <button
+                            onClick={() => handleMediaClick(media.id)}
+                            onTouchEnd={() => handleMediaClick(media.id)}
+                            className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-all duration-300 hover:scale-105 hover:shadow-md transform"
+                          >
+                            <Play className="w-3 h-3 transform transition-all duration-300 hover:scale-110" />
+                            Play
+                          </button>
+                        )}
                                                  <button
-                           onClick={() => handleDownload(media)}
-                           onTouchEnd={() => handleDownload(media)}
+                           onClick={() => media.type === 'link' ? window.open(media.url, '_blank') : handleDownload(media)}
+                           onTouchEnd={() => media.type === 'link' ? window.open(media.url, '_blank') : handleDownload(media)}
                            className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-all duration-300 hover:scale-105 hover:shadow-md transform"
                          >
-                           <Download className="w-3 h-3 transform transition-all duration-300 hover:scale-110" />
-                           Download
+                           {media.type === 'link' ? (
+                             <>
+                               <ExternalLink className="w-3 h-3 transform transition-all duration-300 hover:scale-110" />
+                               Open
+                             </>
+                           ) : (
+                             <>
+                               <Download className="w-3 h-3 transform transition-all duration-300 hover:scale-110" />
+                               Download
+                             </>
+                           )}
                          </button>
-                         <button
+                         {media.type !== 'link' && (
+                           <button
                            onClick={() => handleOpenInNewTab(media)}
                            onTouchEnd={() => handleOpenInNewTab(media)}
                            className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-all duration-300 hover:scale-105 hover:shadow-md transform"
@@ -485,6 +542,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                            <ExternalLink className="w-3 h-3 transform transition-all duration-300 hover:scale-110" />
                            Open
                          </button>
+                         )}
                       </div>
                     </div>
                   ))}
@@ -527,6 +585,13 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           </div>
         </div>
       )}
+
+      {/* Media Player */}
+      <MediaPlayer
+        media={selectedMediaForPlayer}
+        isOpen={!!selectedMediaForPlayer}
+        onClose={() => setSelectedMediaForPlayer(null)}
+      />
 
       {/* No File Path Input Modal (deprecated) */}
 

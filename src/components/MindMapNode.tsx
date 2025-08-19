@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Check, X, Plus, Image, FileText, ExternalLink } from 'lucide-react';
+import { Check, X, Plus, Image, FileText, ExternalLink, Play, Link, Youtube, Music, Video } from 'lucide-react';
 import { MindMapNode as NodeType } from '../types';
+import { MediaPlayer } from './MediaPlayer';
 import { useFilePaths } from '../hooks/useFilePaths';
 
 interface MindMapNodeProps {
@@ -37,6 +38,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [selectedMediaForPlayer, setSelectedMediaForPlayer] = useState<any>(null);
   const nodeRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
@@ -228,8 +230,37 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
     }
   };
 
+  const getMediaIcon = (media: any) => {
+    if (media.type === 'image') {
+      return <Image className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
+    } else if (media.type === 'document') {
+      return <FileText className="w-4 h-4 text-green-600 dark:text-green-400" />;
+    } else if (media.type === 'link') {
+      switch (media.linkType) {
+        case 'youtube':
+          return <Youtube className="w-4 h-4 text-red-500" />;
+        case 'video':
+          return <Video className="w-4 h-4 text-blue-500" />;
+        case 'audio':
+          return <Music className="w-4 h-4 text-green-500" />;
+        default:
+          return <Link className="w-4 h-4 text-gray-500" />;
+      }
+    }
+    return <FileText className="w-4 h-4 text-gray-500" />;
+  };
+
+  const handleMediaClick = (media: any) => {
+    if (media.type === 'link') {
+      setSelectedMediaForPlayer(media);
+    } else {
+      handleOpenMedia(media);
+    }
+  };
+
   return (
-    <div
+    <>
+      <div
       ref={nodeRef}
       className={`absolute select-none ${isDragging ? 'z-50' : 'z-30'} ${
         isHandTool ? 'pointer-events-none' : 'cursor-move'
@@ -378,22 +409,34 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
             {node.media.map((media) => (
               <div key={media.id} className="p-2 bg-gray-50 dark:bg-gray-700 rounded border">
                 <div className="flex items-center gap-2">
-                  {media.type === 'image' ? (
-                    <Image className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  ) : (
-                    <FileText className="w-4 h-4 text-green-600 dark:text-green-400" />
-                  )}
+                  {getMediaIcon(media)}
                   <span className="text-sm text-gray-700 dark:text-gray-300 truncate flex-1">
                     {media.name}
                   </span>
+                  {media.type === 'link' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMediaClick(media);
+                      }}
+                      onTouchEnd={(e) => {
+                        e.stopPropagation();
+                        handleMediaClick(media);
+                      }}
+                      className="text-gray-500 hover:text-green-600 dark:hover:text-green-400"
+                      title="Play media"
+                    >
+                      <Play className="w-3 h-3" />
+                    </button>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleOpenMedia(media);
+                      handleMediaClick(media);
                     }}
                     onTouchEnd={(e) => {
                       e.stopPropagation();
-                      handleOpenMedia(media);
+                      handleMediaClick(media);
                     }}
                     className="text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
                   >
@@ -469,6 +512,14 @@ className={`flex-1 py-2 rounded border-2 border-dashed border-gray-400 dark:bord
         </button>
         </div>
       </div>
-    </div>
+      </div>
+
+      {/* Media Player */}
+      <MediaPlayer
+        media={selectedMediaForPlayer}
+        isOpen={!!selectedMediaForPlayer}
+        onClose={() => setSelectedMediaForPlayer(null)}
+      />
+    </>
   );
 };

@@ -7,6 +7,7 @@ import { FormattingToolbar } from './FormattingToolbar';
 import { FileOperations } from './FileOperations';
 import { ConnectionToolbar } from './ConnectionToolbar';
 import { DocumentViewer } from './DocumentViewer';
+import { LinkInputModal } from './LinkInputModal';
 import { useFilePaths } from '../hooks/useFilePaths';
 
 
@@ -97,6 +98,7 @@ export const MindMap: React.FC = () => {
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isDocumentViewerOpen, setIsDocumentViewerOpen] = useState(false);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
 
   // Manual save function
   const saveToStorage = useCallback(() => {
@@ -452,8 +454,13 @@ export const MindMap: React.FC = () => {
     ));
   }, [selectedNodeId]);
 
-  const handleAddMedia = useCallback((type: 'image' | 'document') => {
+  const handleAddMedia = useCallback((type: 'image' | 'document' | 'link') => {
     if (!selectedNodeId) return;
+    
+    if (type === 'link') {
+      setIsLinkModalOpen(true);
+      return;
+    }
     
     const input = document.createElement('input');
     input.type = 'file';
@@ -535,6 +542,29 @@ export const MindMap: React.FC = () => {
     // Also remove the file path from storage
     removeFilePath(mediaId);
   }, [removeFilePath]);
+
+  const handleAddLink = useCallback((url: string, name: string, linkType: 'youtube' | 'video' | 'audio' | 'other') => {
+    if (!selectedNodeId) return;
+    
+    const mediaId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    
+    const newMedia = {
+      type: 'link' as const,
+      url,
+      name,
+      id: mediaId,
+      linkType,
+    };
+    
+    setNodes(prev => prev.map(node => 
+      node.id === selectedNodeId 
+        ? { 
+            ...node, 
+            media: [...node.media, newMedia]
+          }
+        : node
+    ));
+  }, [selectedNodeId]);
 
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
     if (isHandTool) {
@@ -871,6 +901,13 @@ export const MindMap: React.FC = () => {
         onUpdateNodeChat={(chat) => {
           if (selectedNodeId) handleUpdateNodeChat(selectedNodeId, chat);
         }}
+      />
+
+      {/* Link Input Modal */}
+      <LinkInputModal
+        isOpen={isLinkModalOpen}
+        onClose={() => setIsLinkModalOpen(false)}
+        onAddLink={handleAddLink}
       />
     </div>
   );

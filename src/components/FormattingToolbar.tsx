@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bold, Italic, Underline, Strikethrough, Palette, Type, Image, FileText } from 'lucide-react';
+import { Bold, Italic, Underline, Strikethrough, Palette, Type, Image, FileText, Link } from 'lucide-react';
 import { HighlightColor, TextColor } from '../types';
 
 interface FormattingToolbarProps {
@@ -7,7 +7,7 @@ interface FormattingToolbarProps {
   onFormatText: (format: 'bold' | 'italic' | 'underline' | 'strikethrough') => void;
   onHighlightText: (color: HighlightColor) => void;
   onTextColor: (color: TextColor) => void;
-  onAddMedia: (type: 'image' | 'document') => void;
+  onAddMedia: (type: 'image' | 'document' | 'link') => void;
   currentFormatting: {
     bold: boolean;
     italic: boolean;
@@ -169,6 +169,14 @@ export const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
         title="Add Document"
       >
         <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
+      </button>
+      
+      <button
+        onClick={() => onAddMedia('link')}
+        className="p-1.5 sm:p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-400"
+        title="Add Link (YouTube, Video, Audio)"
+      >
+        <Link className="w-3 h-3 sm:w-4 sm:h-4" />
       </button>
     </div>
   );
