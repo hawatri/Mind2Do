@@ -24,13 +24,13 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const [model, setModel] = useState<string>('deepseek-r1:1.5b');
   const [systemPrompt] = useState<string>('You are a helpful assistant for a mindmap/todo app. Keep responses concise.');
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant' | 'system'; content: string }[]>(selectedNode?.chat || []);
+
   useEffect(() => {
     // When selected node changes, swap chat log to that node's saved chat
     setMessages(selectedNode?.chat || []);
   }, [selectedNode?.id]);
   const [input, setInput] = useState<string>('');
   const [isSending, setIsSending] = useState<boolean>(false);
-  const [useFullContext, setUseFullContext] = useState<boolean>(false);
   const [notification, setNotification] = useState<{
     message: string;
     type: 'success' | 'error' | 'info';
@@ -139,13 +139,14 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
   const nodeContext = useMemo(() => {
     if (!selectedNode) return '';
-    const allDocs = (selectedNode.media || [])
+    // Build retrieval context from node media (extractedText)
+    const docs = (selectedNode.media || [])
       .map(m => m.extractedText)
-      .filter(Boolean) as string[];
-    const joined = useFullContext ? allDocs.join('\n---\n') : allDocs.slice(0, 3).join('\n---\n');
-    const docs = joined.slice(0, 20000); // cap to ~20k chars
+      .filter(Boolean)
+      .slice(0, 3) // limit
+      .join('\n---\n');
     return `Selected Node\nTitle: ${selectedNode.title}\nDescription: ${selectedNode.description}` + (docs ? `\n\nRelevant docs:\n${docs}` : '');
-  }, [selectedNode, useFullContext]);
+  }, [selectedNode]);
 
   useEffect(() => {
     const handler = () => setActiveTab('chat');
@@ -153,18 +154,20 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     return () => window.removeEventListener('mind2do-open-chat', handler as EventListener);
   }, []);
 
-  // shared extraction routine
-  const extractMediaForNode = async () => {
-    if (!selectedNode) return false;
-    try {
-      setNotification({ message: 'Extracting text from attachments…', type: 'info', isVisible: true });
+  // On mount or node change, extract text from media where missing
+  useEffect(() => {
+    const run = async () => {
+      if (!selectedNode) return;
       const updatedMedia = await Promise.all((selectedNode.media || []).map(async (m) => {
         if (m.extractedText) return m;
+        // Only extract if base64 URL is present
         if (!m.url?.startsWith('data:')) return m;
         try {
           if (m.type === 'document') {
             const mime = m.url.split(';')[0].replace('data:', '');
+            // PDF
             if (mime.includes('pdf')) {
+              // pdfjs worker setup (vite-friendly)
               // @ts-ignore
               pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
               const pdfData = atob(m.url.split(',')[1]);
@@ -181,11 +184,13 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
               }
               return { ...m, extractedText: text.slice(0, 8000), mimeType: mime };
             }
+            // Plain text
             if (mime.startsWith('text/')) {
               const text = atob(m.url.split(',')[1]);
               return { ...m, extractedText: text.slice(0, 8000), mimeType: mime };
             }
           }
+          // Image OCR via tesseract
           if (m.type === 'image') {
             const worker = await createWorker();
             await (worker as any).loadLanguage('eng');
@@ -200,19 +205,12 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         return m;
       }));
       if (JSON.stringify(updatedMedia) !== JSON.stringify(selectedNode.media)) {
+        // Persist back to node via chat updater if provided
+        // We reuse onUpdateNodeChat pathway by updating selected node through a custom event
         window.dispatchEvent(new CustomEvent('mind2do-update-node-media', { detail: { nodeId: selectedNode.id, media: updatedMedia } }));
       }
-      setNotification({ message: 'Extraction complete', type: 'success', isVisible: true });
-      return true;
-    } catch (e) {
-      setNotification({ message: 'Extraction failed', type: 'error', isVisible: true });
-      return false;
-    }
-  };
-
-  // On mount or node change, extract text from media where missing
-  useEffect(() => {
-    extractMediaForNode();
+    };
+    run();
   }, [selectedNode?.id]);
 
   const sendMessage = async () => {
@@ -322,10 +320,6 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                   <option value="gemma3:4b">Gemma 3 4B</option>
                   
                 </select>
-                <label className="flex items-center gap-1 text-[11px] ml-2 text-gray-600 dark:text-gray-300">
-                  <input type="checkbox" checked={useFullContext} onChange={(e) => setUseFullContext(e.target.checked)} />
-                  Full context
-                </label>
               </div>
 
               <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
