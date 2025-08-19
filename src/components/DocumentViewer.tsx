@@ -232,7 +232,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                 className="space-y-3 media-list"
                 style={{
                 overflowY: 'auto',
-                                  maxHeight: '700px', // Adjust this value as needed
+                                  maxHeight: '350px', // Adjust this value as needed
                                   // Inline styles to re-enable scrollbars
                                   WebkitOverflowScrolling: 'touch',
                 }}>
