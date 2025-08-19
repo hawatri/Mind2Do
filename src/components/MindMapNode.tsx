@@ -431,11 +431,13 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
  <button style={{ minWidth: '120px' }}
  onClick={(e) => {
  e.stopPropagation();
-            // TODO: Implement AI Suggestion logic
+            const event = new Event('mind2do-open-chat');
+            window.dispatchEvent(event);
  }}
  onTouchEnd={(e) => {
  e.stopPropagation();
-            // TODO: Implement AI Suggestion logic
+            const event = new Event('mind2do-open-chat');
+            window.dispatchEvent(event);
  }}
  className={`flex-1 py-2 rounded border-2 border-dashed border-gray-400 dark:border-gray-600 hover:border-blue-500 text-gray-700 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center gap-2 font-medium text-nowrap ${
  isHandTool ? 'pointer-events-none opacity-50' : ''

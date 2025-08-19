@@ -130,6 +130,24 @@ export const MindMap: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [saveToStorage]);
 
+  // Open sidebar on AI Suggestion event
+  useEffect(() => {
+    const openChat = () => setIsDocumentViewerOpen(true);
+    window.addEventListener('mind2do-open-chat', openChat as EventListener);
+    return () => window.removeEventListener('mind2do-open-chat', openChat as EventListener);
+  }, []);
+
+  // Persist media updates from extraction
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { nodeId: string, media: MindMapNode['media'] };
+      if (!detail) return;
+      setNodes(prev => prev.map(n => n.id === detail.nodeId ? { ...n, media: detail.media } : n));
+    };
+    window.addEventListener('mind2do-update-node-media', handler as EventListener);
+    return () => window.removeEventListener('mind2do-update-node-media', handler as EventListener);
+  }, []);
+
   // Global wheel event prevention for the entire mind map area
   useEffect(() => {
     const handleGlobalWheel = (e: WheelEvent) => {
@@ -222,7 +240,8 @@ export const MindMap: React.FC = () => {
       connections: node.connections || [],
       media: node.media || [],
       title: node.title || 'Untitled',
-      description: node.description || 'Click to edit description'
+      description: node.description || 'Click to edit description',
+      chat: node.chat || []
     }));
     
     // Restore file paths for media that have them
@@ -301,6 +320,11 @@ export const MindMap: React.FC = () => {
     setNodes(prev => prev.map(node => 
       node.id === id ? { ...node, ...updates } : node
     ));
+  }, []);
+
+  // Persist per-node chat when DocumentViewer updates messages
+  const handleUpdateNodeChat = useCallback((id: string, chat: { role: 'user' | 'assistant' | 'system'; content: string }[]) => {
+    setNodes(prev => prev.map(node => node.id === id ? { ...node, chat } : node));
   }, []);
 
   const handleNodeDelete = useCallback((id: string) => {
@@ -844,6 +868,9 @@ export const MindMap: React.FC = () => {
         isOpen={isDocumentViewerOpen}
         onClose={() => setIsDocumentViewerOpen(false)}
         selectedNode={selectedNodeId ? nodes.find(n => n.id === selectedNodeId) || null : null}
+        onUpdateNodeChat={(chat) => {
+          if (selectedNodeId) handleUpdateNodeChat(selectedNodeId, chat);
+        }}
       />
     </div>
   );

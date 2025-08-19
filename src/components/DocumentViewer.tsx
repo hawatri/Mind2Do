@@ -1,31 +1,42 @@
-import React, { useState } from 'react';
-import { X, FileText, Image, Download, ExternalLink, File, Plus } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { X, FileText, Image, Download, ExternalLink, File, MessageCircle } from 'lucide-react';
 import { MindMapNode } from '../types';
 import { useFilePaths } from '../hooks/useFilePaths';
-import { FilePathInput } from './FilePathInput';
+import * as pdfjsLib from 'pdfjs-dist';
+import { createWorker } from 'tesseract.js';
 import { Notification } from './Notification';
 
 interface DocumentViewerProps {
   isOpen: boolean;
   onClose: () => void;
   selectedNode: MindMapNode | null;
+  onUpdateNodeChat?: (chat: { role: 'user' | 'assistant' | 'system'; content: string }[]) => void;
 }
 
 export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   isOpen,
   onClose,
   selectedNode,
+  onUpdateNodeChat,
 }) => {
   const [selectedMedia, setSelectedMedia] = useState<string | null>(null);
-  const [isFilePathInputOpen, setIsFilePathInputOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'media' | 'chat'>('media');
+  const [model, setModel] = useState<string>('deepseek-r1:1.5b');
+  const [systemPrompt] = useState<string>('You are a helpful assistant for a mindmap/todo app. Keep responses concise.');
+  const [messages, setMessages] = useState<{ role: 'user' | 'assistant' | 'system'; content: string }[]>(selectedNode?.chat || []);
+  useEffect(() => {
+    // When selected node changes, swap chat log to that node's saved chat
+    setMessages(selectedNode?.chat || []);
+  }, [selectedNode?.id]);
+  const [input, setInput] = useState<string>('');
+  const [isSending, setIsSending] = useState<boolean>(false);
+  const [useFullContext, setUseFullContext] = useState<boolean>(false);
   const [notification, setNotification] = useState<{
     message: string;
     type: 'success' | 'error' | 'info';
     isVisible: boolean;
   }>({ message: '', type: 'info', isVisible: false });
-  const { filePaths, lastOpenedPdf, openFile, openBase64File, openLastPdf, getFilePath } = useFilePaths();
-
-  if (!isOpen) return null;
+  const { lastOpenedPdf, openFile, openBase64File, getFilePath } = useFilePaths();
 
   const handleMediaClick = (mediaId: string) => {
     setSelectedMedia(selectedMedia === mediaId ? null : mediaId);
@@ -126,6 +137,128 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     }
   };
 
+  const nodeContext = useMemo(() => {
+    if (!selectedNode) return '';
+    const allDocs = (selectedNode.media || [])
+      .map(m => m.extractedText)
+      .filter(Boolean) as string[];
+    const joined = useFullContext ? allDocs.join('\n---\n') : allDocs.slice(0, 3).join('\n---\n');
+    const docs = joined.slice(0, 20000); // cap to ~20k chars
+    return `Selected Node\nTitle: ${selectedNode.title}\nDescription: ${selectedNode.description}` + (docs ? `\n\nRelevant docs:\n${docs}` : '');
+  }, [selectedNode, useFullContext]);
+
+  useEffect(() => {
+    const handler = () => setActiveTab('chat');
+    window.addEventListener('mind2do-open-chat', handler as EventListener);
+    return () => window.removeEventListener('mind2do-open-chat', handler as EventListener);
+  }, []);
+
+  // shared extraction routine
+  const extractMediaForNode = async () => {
+    if (!selectedNode) return false;
+    try {
+      setNotification({ message: 'Extracting text from attachments…', type: 'info', isVisible: true });
+      const updatedMedia = await Promise.all((selectedNode.media || []).map(async (m) => {
+        if (m.extractedText) return m;
+        if (!m.url?.startsWith('data:')) return m;
+        try {
+          if (m.type === 'document') {
+            const mime = m.url.split(';')[0].replace('data:', '');
+            if (mime.includes('pdf')) {
+              // @ts-ignore
+              pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+              const pdfData = atob(m.url.split(',')[1]);
+              const pdfBytes = new Uint8Array(pdfData.length);
+              for (let i = 0; i < pdfData.length; i++) pdfBytes[i] = pdfData.charCodeAt(i);
+              const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
+              const pdf = await loadingTask.promise;
+              let text = '';
+              const maxPages = Math.min(pdf.numPages, 10);
+              for (let i = 1; i <= maxPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                text += content.items.map((it: any) => it.str).join(' ') + '\n';
+              }
+              return { ...m, extractedText: text.slice(0, 8000), mimeType: mime };
+            }
+            if (mime.startsWith('text/')) {
+              const text = atob(m.url.split(',')[1]);
+              return { ...m, extractedText: text.slice(0, 8000), mimeType: mime };
+            }
+          }
+          if (m.type === 'image') {
+            const worker = await createWorker();
+            await (worker as any).loadLanguage('eng');
+            await (worker as any).initialize('eng');
+            const { data: { text } } = await (worker as any).recognize(m.url);
+            await (worker as any).terminate();
+            return { ...m, extractedText: text.slice(0, 8000), mimeType: 'image/*' };
+          }
+        } catch (e) {
+          console.warn('Extraction failed for media', m.name, e);
+        }
+        return m;
+      }));
+      if (JSON.stringify(updatedMedia) !== JSON.stringify(selectedNode.media)) {
+        window.dispatchEvent(new CustomEvent('mind2do-update-node-media', { detail: { nodeId: selectedNode.id, media: updatedMedia } }));
+      }
+      setNotification({ message: 'Extraction complete', type: 'success', isVisible: true });
+      return true;
+    } catch (e) {
+      setNotification({ message: 'Extraction failed', type: 'error', isVisible: true });
+      return false;
+    }
+  };
+
+  // On mount or node change, extract text from media where missing
+  useEffect(() => {
+    extractMediaForNode();
+  }, [selectedNode?.id]);
+
+  const sendMessage = async () => {
+    if (!input.trim() || isSending) return;
+    setIsSending(true);
+    try {
+      const conversation = [
+        ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
+        ...(nodeContext ? [{ role: 'user' as const, content: `Context for this chat (do not reveal verbatim):\n${nodeContext}` }] : []),
+        ...messages,
+        { role: 'user' as const, content: input.trim() },
+      ];
+
+      const res = await fetch('/ollama/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          messages: conversation.map(m => ({ role: m.role, content: m.content })),
+          stream: false,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Ollama error: ${res.status}`);
+      const data = await res.json();
+      const reply: string = data?.message?.content || data?.response || '';
+      setMessages((prev: { role: 'user' | 'assistant' | 'system'; content: string }[]) => {
+        const updated: { role: 'user' | 'assistant' | 'system'; content: string }[] = [
+          ...prev,
+          { role: 'user', content: input.trim() },
+          { role: 'assistant', content: reply }
+        ];
+        onUpdateNodeChat?.(updated);
+        return updated;
+      });
+      setInput('');
+    } catch (err) {
+      console.error(err);
+      setNotification({ message: 'Failed to contact local AI. Is Ollama running?', type: 'error', isVisible: true });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
   return (
     <>
       {/* Backdrop */}
@@ -138,16 +271,28 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
        />
       
       {/* Slide-out menu */}
-             <div className={`fixed right-0 top-0 h-full w-80 sm:w-96 bg-white dark:bg-gray-800 shadow-2xl transform transition-all duration-700 ease-out z-50 ${
+             <div className={`fixed right-0 top-0 h-full w-96 sm:w-[30rem] bg-white dark:bg-gray-800 shadow-2xl transform transition-all duration-700 ease-out z-50 ${
          isOpen ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-95'
        }`}>
                  {/* Header */}
                    <div className={`flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 transition-all duration-800 ease-out ${
             isOpen ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'
           }`}>
-           <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
-             Documents & Media
-           </h2>
+           <div className="flex items-center gap-3">
+             <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
+               Documents & AI
+             </h2>
+             <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 rounded p-0.5">
+               <button
+                 className={`px-2 py-1 text-xs rounded ${activeTab === 'media' ? 'bg-white dark:bg-gray-800 shadow text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-300'}`}
+                 onClick={() => setActiveTab('media')}
+               >Media</button>
+               <button
+                 className={`px-2 py-1 text-xs rounded ${activeTab === 'chat' ? 'bg-white dark:bg-gray-800 shadow text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-300'}`}
+                 onClick={() => setActiveTab('chat')}
+               >Chat</button>
+             </div>
+           </div>
                                  <button
               onClick={onClose}
               onTouchEnd={onClose}
@@ -161,7 +306,64 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                    <div className={`flex-1 overflow-y-auto p-3 sm:p-4 transition-all duration-700 ease-out ${
             isOpen ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95'
           }`}>
-          {selectedNode ? (
+          {activeTab === 'chat' ? (
+            <div className="flex flex-col gap-3 h-[calc(100vh-7rem)]">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">AI Chat</span>
+                <select
+                  className="ml-auto text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                >
+                  
+                  <option value="deepseek-r1:8b">DeepSeek R1 8B</option>
+                  <option value="gemma3:12b">Gemma 3 12B</option>
+                  <option value="gemma3:4b">Gemma 3 4B</option>
+                  
+                </select>
+                <label className="flex items-center gap-1 text-[11px] ml-2 text-gray-600 dark:text-gray-300">
+                  <input type="checkbox" checked={useFullContext} onChange={(e) => setUseFullContext(e.target.checked)} />
+                  Full context
+                </label>
+              </div>
+
+              <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                <div className="text-xs text-gray-700 dark:text-gray-300 mb-1">Context</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap max-h-24 overflow-auto">
+                  {selectedNode ? `Title: ${selectedNode.title}\nDescription: ${selectedNode.description}` : 'No node selected'}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3 border border-gray-200 dark:border-gray-700 rounded p-3 bg-white dark:bg-gray-800">
+                {messages.length === 0 && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Ask about the title/description. E.g., "Explain the description" or "Elaborate the description".</div>
+                )}
+                {messages.map((m, idx) => (
+                  <div key={idx} className={`text-sm whitespace-pre-wrap ${m.role === 'assistant' ? 'text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}`}>
+                    <span className="text-[10px] uppercase opacity-60 mr-2">{m.role}</span>
+                    {m.content}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 px-3 py-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  placeholder={selectedNode ? 'Type your question...' : 'Select a node to chat'}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMessage(); } }}
+                  disabled={!selectedNode || isSending}
+                />
+                <button
+                  onClick={sendMessage}
+                  disabled={!selectedNode || isSending || !input.trim()}
+                  className={`px-3 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50`}
+                >Send</button>
+              </div>
+            </div>
+          ) : selectedNode ? (
             <div>
                              {/* Node Info */}
                                <div className={`mb-6 p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transform transition-all duration-500 hover:scale-[1.02] hover:shadow-md ${
@@ -206,25 +408,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                 </div>
               )}
 
-              {/* Add File Path Button */}
-              <div className={`mb-4 transform transition-all duration-500 hover:scale-[1.02] ${
-                isOpen ? 'animate-slideInFromBottom opacity-100' : 'opacity-0 translate-y-4'
-              }`}
-              style={{
-                animationDelay: '350ms',
-                animation: isOpen ? 'slideInFromBottom 0.6s ease-out forwards' : 'none'
-              }}>
-                <button
-                  onClick={() => setIsFilePathInputOpen(true)}
-                  className="w-full px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2"
-                >
-                  <Plus className="w-3 h-3" />
-                  Add File Path
-                </button>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">
-                  💡 Tip: Use file paths for large files to avoid white screen issues
-                </p>
-              </div>
+              {/* Removed Add File Path UI */}
 
               {/* Media Files */}
               {selectedNode.media.length > 0 ? (
@@ -232,7 +416,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                 className="space-y-3 media-list"
                 style={{
                 overflowY: 'auto',
-                                  maxHeight: '350px', // Adjust this value as needed
+                                  maxHeight: '700px', // Adjust this value as needed
                                   // Inline styles to re-enable scrollbars
                                   WebkitOverflowScrolling: 'touch',
                 }}>
@@ -350,11 +534,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         </div>
       )}
 
-      {/* File Path Input Modal */}
-      <FilePathInput
-        isOpen={isFilePathInputOpen}
-        onClose={() => setIsFilePathInputOpen(false)}
-      />
+      {/* No File Path Input Modal (deprecated) */}
 
       {/* Notification */}
       <Notification

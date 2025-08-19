@@ -16,7 +16,10 @@ export interface MindMapNode {
     size?: number;
     lastModified?: number;
     filePath?: string; // Optional file path for better performance
+    mimeType?: string;
+    extractedText?: string;
   }[];
+  chat?: { role: 'user' | 'assistant' | 'system'; content: string }[];
   formatting: {
     bold: boolean;
     italic: boolean;
