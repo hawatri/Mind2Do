@@ -251,13 +251,125 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
   };
 
   const handleMediaClick = (media: any) => {
-    if (media.type === 'link') {
-      setSelectedMediaForPlayer(media);
-    } else {
-      handleOpenMedia(media);
-    }
+    handleOpenMedia(media);
   };
 
+  const getVideoThumbnail = (media: any): string | null => {
+    if (media.type !== 'link') return null;
+    
+    if (media.linkType === 'youtube') {
+      // Extract YouTube video ID and get thumbnail
+      const videoIdMatch = media.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
+      if (videoIdMatch) {
+        return `https://img.youtube.com/vi/${videoIdMatch[1]}/mqdefault.jpg`;
+      }
+    }
+    
+    return null;
+  };
+
+  const renderInlineMedia = (media: any) => {
+    if (media.type === 'link') {
+      switch (media.linkType) {
+        case 'youtube':
+          const videoIdMatch = media.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
+          if (videoIdMatch) {
+            return (
+              <iframe
+                src={`https://www.youtube.com/embed/${videoIdMatch[1]}?rel=0`}
+                title={media.name}
+                className="w-full h-48 rounded border border-gray-200 dark:border-gray-600"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            );
+          }
+          break;
+        case 'video':
+          if (media.url.includes('vimeo.com')) {
+            const videoIdMatch = media.url.match(/vimeo\.com\/(\d+)/);
+            if (videoIdMatch) {
+              return (
+                <iframe
+                  src={`https://player.vimeo.com/video/${videoIdMatch[1]}`}
+                  title={media.name}
+                  className="w-full h-48 rounded border border-gray-200 dark:border-gray-600"
+                  frameBorder="0"
+                  allow="autoplay; fullscreen; picture-in-picture"
+                  allowFullScreen
+                />
+              );
+            }
+          } else {
+            return (
+              <video
+                controls
+                className="w-full h-48 rounded border border-gray-200 dark:border-gray-600 bg-black"
+                preload="metadata"
+              >
+                <source src={media.url} type="video/mp4" />
+                <source src={media.url} type="video/webm" />
+                <source src={media.url} type="video/ogg" />
+                Your browser does not support the video tag.
+              </video>
+            );
+          }
+          break;
+        case 'audio':
+          if (media.url.includes('soundcloud.com')) {
+            return (
+              <iframe
+                width="100%"
+                height="166"
+                scrolling="no"
+                frameBorder="no"
+                allow="autoplay"
+                src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(media.url)}&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true`}
+                className="rounded border border-gray-200 dark:border-gray-600"
+              />
+            );
+          } else {
+            return (
+              <audio
+                controls
+                className="w-full rounded border border-gray-200 dark:border-gray-600"
+                preload="metadata"
+              >
+                <source src={media.url} type="audio/mpeg" />
+                <source src={media.url} type="audio/wav" />
+                <source src={media.url} type="audio/ogg" />
+                Your browser does not support the audio tag.
+              </audio>
+            );
+          }
+          break;
+        default:
+          // For other link types, show thumbnail if available
+          const thumbnail = getVideoThumbnail(media);
+          if (thumbnail) {
+            return (
+              <div className="relative">
+                <img
+                  src={thumbnail}
+                  alt={media.name}
+                  className="w-full h-32 object-cover rounded border border-gray-200 dark:border-gray-600 cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => window.open(media.url, '_blank')}
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-black bg-opacity-60 rounded-full p-3 hover:bg-opacity-80 transition-all cursor-pointer"
+                       onClick={() => window.open(media.url, '_blank')}>
+                    <Play className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          return null;
+      }
+    }
+    return null;
+  };
   return (
     <>
       <div
@@ -408,37 +520,30 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
           <div className="mb-3 space-y-2">
             {node.media.map((media) => (
               <div key={media.id} className="p-2 bg-gray-50 dark:bg-gray-700 rounded border">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mb-2">
                   {getMediaIcon(media)}
                   <span className="text-sm text-gray-700 dark:text-gray-300 truncate flex-1">
                     {media.name}
                   </span>
-                  {media.type === 'link' && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMediaClick(media);
-                      }}
-                      onTouchEnd={(e) => {
-                        e.stopPropagation();
-                        handleMediaClick(media);
-                      }}
-                      className="text-gray-500 hover:text-green-600 dark:hover:text-green-400"
-                      title="Play media"
-                    >
-                      <Play className="w-3 h-3" />
-                    </button>
-                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleMediaClick(media);
+                      if (media.type === 'link') {
+                        window.open(media.url, '_blank');
+                      } else {
+                        handleMediaClick(media);
+                      }
                     }}
                     onTouchEnd={(e) => {
                       e.stopPropagation();
-                      handleMediaClick(media);
+                      if (media.type === 'link') {
+                        window.open(media.url, '_blank');
+                      } else {
+                        handleMediaClick(media);
+                      }
                     }}
                     className="text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
+                    title={media.type === 'link' ? 'Open in new tab' : 'Open file'}
                   >
                     <ExternalLink className="w-3 h-3" />
                   </button>
@@ -456,11 +561,16 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
                     <X className="w-3 h-3" />
                   </button>
                 </div>
+                
+                {/* Inline Media Player */}
+                {media.type === 'link' && renderInlineMedia(media)}
+                
+                {/* Image Preview */}
                 {media.type === 'image' && (
                   <img
                     src={media.url}
                     alt={media.name}
-                    className="mt-2 max-w-full h-auto rounded max-h-32 object-cover"
+                    className="max-w-full h-auto rounded max-h-32 object-cover"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
@@ -514,12 +624,6 @@ className={`flex-1 py-2 rounded border-2 border-dashed border-gray-400 dark:bord
       </div>
       </div>
 
-      {/* Media Player */}
-      <MediaPlayer
-        media={selectedMediaForPlayer}
-        isOpen={!!selectedMediaForPlayer}
-        onClose={() => setSelectedMediaForPlayer(null)}
-      />
     </>
   );
 };
