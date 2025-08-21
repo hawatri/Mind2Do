@@ -46,7 +46,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
           <iframe
             src={getYouTubeEmbedUrl(media.url)}
             title={media.name}
-            className="w-full h-64 sm:h-80 rounded-lg"
+            className="w-full h-48 sm:h-64 rounded-lg"
             frameBorder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
@@ -100,7 +100,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
         return (
           <audio
             controls
-            className="w-full rounded-lg"
+            className="w-full h-48 sm:h-64 rounded-lg bg-black"
             preload="metadata"
           >
             <source src={media.url} type="audio/mpeg" />
@@ -112,7 +112,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       
       default:
         return (
-          <div className="w-full h-64 sm:h-80 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+          <div className="w-full h-48 sm:h-64 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
             <div className="text-center">
               <ExternalLink className="w-12 h-12 mx-auto mb-4 text-gray-400" />
               <p className="text-gray-600 dark:text-gray-400 mb-4">
@@ -141,7 +141,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       
       {/* Player Modal */}
       <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
@@ -165,17 +165,17 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
           </div>
           
           {/* Player */}
-          <div className="p-4">
+          <div className="p-3">
             {renderPlayer()}
           </div>
           
           {/* Footer */}
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+          <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 <span className="capitalize">{media.linkType}</span> • {media.name}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-500 truncate max-w-xs">
+              <div className="text-xs text-gray-500 dark:text-gray-500 truncate max-w-48">
                 {media.url}
               </div>
             </div>
