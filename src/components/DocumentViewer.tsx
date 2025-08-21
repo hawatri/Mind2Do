@@ -22,6 +22,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 }) => {
   const [selectedMedia, setSelectedMedia] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'media' | 'chat'>('media');
+  const [selectedMediaForPlayer, setSelectedMediaForPlayer] = useState<any>(null);
   const [model, setModel] = useState<string>('deepseek-r1:1.5b');
   const [systemPrompt] = useState<string>('You are a helpful assistant for a mindmap/todo app. Keep responses concise.');
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant' | 'system'; content: string }[]>(selectedNode?.chat || []);
@@ -41,7 +42,11 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
   const handleMediaClick = (mediaId: string) => {
     const media = selectedNode?.media.find(m => m.id === mediaId);
-    setSelectedMedia(selectedMedia === mediaId ? null : mediaId);
+    if (media?.type === 'link') {
+      setSelectedMediaForPlayer(media);
+    } else {
+      setSelectedMedia(selectedMedia === mediaId ? null : mediaId);
+    }
   };
 
   const handleDownload = (media: any) => {
@@ -121,86 +126,6 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     return 'File';
   };
 
-  const renderInlineMedia = (media: any) => {
-    if (media.type === 'link') {
-      switch (media.linkType) {
-        case 'youtube':
-          const videoIdMatch = media.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
-          if (videoIdMatch) {
-            return (
-              <iframe
-                src={`https://www.youtube.com/embed/${videoIdMatch[1]}?rel=0`}
-                title={media.name}
-                className="w-full h-48 rounded border border-gray-200 dark:border-gray-600 mb-3"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            );
-          }
-          break;
-        case 'video':
-          if (media.url.includes('vimeo.com')) {
-            const videoIdMatch = media.url.match(/vimeo\.com\/(\d+)/);
-            if (videoIdMatch) {
-              return (
-                <iframe
-                  src={`https://player.vimeo.com/video/${videoIdMatch[1]}`}
-                  title={media.name}
-                  className="w-full h-48 rounded border border-gray-200 dark:border-gray-600 mb-3"
-                  frameBorder="0"
-                  allow="autoplay; fullscreen; picture-in-picture"
-                  allowFullScreen
-                />
-              );
-            }
-          } else {
-            return (
-              <video
-                controls
-                className="w-full h-48 rounded border border-gray-200 dark:border-gray-600 bg-black mb-3"
-                preload="metadata"
-              >
-                <source src={media.url} type="video/mp4" />
-                <source src={media.url} type="video/webm" />
-                <source src={media.url} type="video/ogg" />
-                Your browser does not support the video tag.
-              </video>
-            );
-          }
-          break;
-        case 'audio':
-          if (media.url.includes('soundcloud.com')) {
-            return (
-              <iframe
-                width="100%"
-                height="166"
-                scrolling="no"
-                frameBorder="no"
-                allow="autoplay"
-                src={`https://w.soundcloud.com/player/?url=${encodeURIComponent(media.url)}&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true`}
-                className="rounded border border-gray-200 dark:border-gray-600 mb-3"
-              />
-            );
-          } else {
-            return (
-              <audio
-                controls
-                className="w-full rounded border border-gray-200 dark:border-gray-600 mb-3"
-                preload="metadata"
-              >
-                <source src={media.url} type="audio/mpeg" />
-                <source src={media.url} type="audio/wav" />
-                <source src={media.url} type="audio/ogg" />
-                Your browser does not support the audio tag.
-              </audio>
-            );
-          }
-          break;
-      }
-    }
-    return null;
-  };
   const handleOpenInNewTab = async (media: any) => {
     try {
       // First check if we have a file path stored in the media object
@@ -520,6 +445,16 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
               {/* Removed Add File Path UI */}
 
+              {/* Media Files */}
+              {selectedNode.media.length > 0 ? (
+                <div
+                className="space-y-3 media-list"
+                style={{
+                overflowY: 'auto',
+                                  maxHeight: '700px', // Adjust this value as needed
+                                  // Inline styles to re-enable scrollbars
+                                  WebkitOverflowScrolling: 'touch',
+                }}>
                   <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3">
                     Attachments ({selectedNode.media.length})
                   </h4>
@@ -548,9 +483,6 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                            </p>
                          </div>
                       </div>
-
-                      {/* Inline Media Player */}
-                      {renderInlineMedia(media)}
 
                       {/* Media Preview/Content */}
                       {media.type === 'image' && (
@@ -654,6 +586,12 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         </div>
       )}
 
+      {/* Media Player */}
+      <MediaPlayer
+        media={selectedMediaForPlayer}
+        isOpen={!!selectedMediaForPlayer}
+        onClose={() => setSelectedMediaForPlayer(null)}
+      />
 
       {/* No File Path Input Modal (deprecated) */}
 
