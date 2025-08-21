@@ -629,7 +629,6 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
              </div>
           )}
         </div>
-      </div>
 
       {/* Full-size Media Viewer */}
       {selectedMedia && (
