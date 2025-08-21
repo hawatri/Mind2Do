@@ -627,9 +627,9 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                <FileText className="w-12 h-12 mx-auto mb-3 opacity-50 transform transition-all duration-500 hover:scale-110 hover:opacity-75" />
                <p className="transform transition-all duration-300 hover:translate-y-1">Select a node to view its documents and media.</p>
              </div>
-           )}
-         </div>
-       </div>
+          )}
+        </div>
+      </div>
 
       {/* Full-size Media Viewer */}
       {selectedMedia && (
