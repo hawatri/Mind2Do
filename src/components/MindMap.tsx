@@ -9,6 +9,7 @@ import { ConnectionToolbar } from './ConnectionToolbar';
 import { DocumentViewer } from './DocumentViewer';
 import { LinkInputModal } from './LinkInputModal';
 import { useFilePaths } from '../hooks/useFilePaths';
+import { SearchBar } from './SearchBar';
 
 
 const createDefaultNode = (): MindMapNode => ({
@@ -621,6 +622,40 @@ export const MindMap: React.FC = () => {
     setIsDraggingCanvas(false);
   }, []);
 
+  const handleNodeCenter = useCallback((nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      // Calculate offset to center the node in the viewport
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      // Node dimensions (approximate)
+      const nodeWidth = 256; // min-w-64 in pixels
+      const nodeHeight = 200; // approximate height
+      
+      const targetX = (viewportWidth / 2) - (nodeWidth / 2);
+      const targetY = (viewportHeight / 2) - (nodeHeight / 2);
+      
+      setCanvasOffset({
+        x: targetX - (node.x * zoom),
+        y: targetY - (node.y * zoom)
+      });
+      
+      // Also select the node
+      setSelectedNodeId(nodeId);
+      setMultiSelectedNodes([]);
+      
+      // Add a brief highlight effect
+      const nodeElement = document.querySelector(`[data-node-id="${nodeId}"]`);
+      if (nodeElement) {
+        nodeElement.classList.add('search-highlight');
+        setTimeout(() => {
+          nodeElement.classList.remove('search-highlight');
+        }, 2000);
+      }
+    }
+  }, [nodes, zoom]);
+
 
   const selectedNode = selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null;
 
@@ -630,6 +665,13 @@ export const MindMap: React.FC = () => {
         nodes={nodes}
         onLoadMindMap={handleLoadMindMap}
         onSave={handleManualSave}
+      />
+
+      <SearchBar
+        nodes={nodes}
+        onNodeSelect={handleNodeSelect}
+        onNodeCenter={handleNodeCenter}
+        selectedNodeId={selectedNodeId}
       />
       
       <FormattingToolbar

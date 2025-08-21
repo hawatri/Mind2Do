@@ -88,3 +88,26 @@ html, body {
   border-radius: 6px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
+
+.search-highlight {
+  animation: searchPulse 2s ease-in-out;
+}
+
+@keyframes searchPulse {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+  }
+  25% { 
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0.3);
+  }
+  50% { 
+    transform: scale(1.02);
+    box-shadow: 0 0 0 20px rgba(59, 130, 246, 0.1);
+  }
+  75% { 
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0.3);
+  }
+}
