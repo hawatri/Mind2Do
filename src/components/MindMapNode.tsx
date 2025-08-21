@@ -4,6 +4,7 @@ import { MindMapNode as NodeType } from '../types';
 import { MediaPlayer } from './MediaPlayer';
 import { useFilePaths } from '../hooks/useFilePaths';
 import { InlineVideoPlayer } from './InlineVideoPlayer';
+import { VideoThumbnail } from './VideoThumbnail';
 
 interface MindMapNodeProps {
   node: NodeType;
@@ -524,7 +525,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
         {node.media.length > 0 && (
   <div className="mb-3 space-y-2">
     {node.media.map((media) => (
-      <div key={media.id} className="border border-gray-200 dark:border-gray-600 rounded">
+      <div key={media.id} className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
         {/* Media Header */}
         <div className="p-2 bg-gray-50 dark:bg-gray-700">
           <div className="flex items-center gap-2">
@@ -561,30 +562,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
               </button>
             )}
             
-            {/* External link button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (media.type === 'link') {
-                  window.open(media.url, '_blank');
-                } else {
-                  handleMediaClick(media);
-                }
-              }}
-              onTouchEnd={(e) => {
-                e.stopPropagation();
-                if (media.type === 'link') {
-                  window.open(media.url, '_blank');
-                } else {
-                  handleMediaClick(media);
-                }
-              }}
-              className="text-gray-500 hover:text-blue-600 dark:hover:text-blue-400"
-              title="Open externally"
-            >
-              <ExternalLink className="w-3 h-3" />
-            </button>
-            
+            {/* Remove button */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -600,6 +578,23 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
             </button>
           </div>
         </div>
+        
+        {/* Video Thumbnail (for link media) */}
+        {media.type === 'link' && !inlinePlayerMedia && (
+          <div className="p-3">
+            <VideoThumbnail
+              media={media}
+              onPlay={() => setInlinePlayerMedia(media)}
+              onExternalLink={() => {
+                if (media.type === 'link') {
+                  window.open(media.url, '_blank');
+                } else {
+                  handleMediaClick(media);
+                }
+              }}
+            />
+          </div>
+        )}
         
         {/* Inline Video Player */}
         {inlinePlayerMedia?.id === media.id && media.type === 'link' && (
@@ -619,7 +614,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
             <img
               src={media.url}
               alt={media.name}
-              className="mt-2 max-w-full h-auto rounded max-h-32 object-cover cursor-pointer hover:opacity-90 transition-all duration-300"
+              className="w-full h-auto rounded max-h-32 object-cover cursor-pointer hover:opacity-90 transition-all duration-300"
               onClick={(e) => {
                 e.stopPropagation();
                 handleMediaClick(media);
@@ -632,6 +627,34 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
+          </div>
+        )}
+        
+        {/* Document preview */}
+        {media.type === 'document' && (
+          <div className="p-2">
+            <div className="bg-gray-100 dark:bg-gray-700 rounded p-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleMediaClick(media);
+              }}
+              onTouchEnd={(e) => {
+                e.stopPropagation();
+                handleMediaClick(media);
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <FileText className="w-8 h-8 text-blue-500" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {media.name}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Click to open document
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

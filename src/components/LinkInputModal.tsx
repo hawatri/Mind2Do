@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
+// 4. Optional: Update LinkInputModal to show thumbnail preview
+// Update your LinkInputModal.tsx to include thumbnail preview:
+
+import React, { useState, useEffect } from 'react';
 import { X, Link, Youtube, Music, Video } from 'lucide-react';
+import { getVideoThumbnail, generateFallbackThumbnail } from '../utils/thumbnailUtils';
 
 interface LinkInputModalProps {
   isOpen: boolean;
@@ -14,6 +18,7 @@ export const LinkInputModal: React.FC<LinkInputModalProps> = ({
 }) => {
   const [url, setUrl] = useState('');
   const [name, setName] = useState('');
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -37,6 +42,25 @@ export const LinkInputModal: React.FC<LinkInputModalProps> = ({
     return 'other';
   };
 
+  // Update thumbnail preview when URL changes
+  useEffect(() => {
+    if (url.trim()) {
+      const linkType = detectLinkType(url);
+      const thumbnail = getVideoThumbnail(url, linkType);
+      if (thumbnail) {
+        setThumbnailPreview(thumbnail);
+      } else if (linkType !== 'other') {
+        // Generate fallback for media types
+        const fallback = generateFallbackThumbnail(linkType, name || 'Video Preview');
+        setThumbnailPreview(fallback);
+      } else {
+        setThumbnailPreview(null);
+      }
+    } else {
+      setThumbnailPreview(null);
+    }
+  }, [url, name]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -47,6 +71,7 @@ export const LinkInputModal: React.FC<LinkInputModalProps> = ({
       // Reset form
       setUrl('');
       setName('');
+      setThumbnailPreview(null);
       onClose();
     }
   };
@@ -54,6 +79,7 @@ export const LinkInputModal: React.FC<LinkInputModalProps> = ({
   const handleCancel = () => {
     setUrl('');
     setName('');
+    setThumbnailPreview(null);
     onClose();
   };
 
@@ -128,6 +154,24 @@ export const LinkInputModal: React.FC<LinkInputModalProps> = ({
                 required
               />
             </div>
+            
+            {/* Thumbnail Preview */}
+            {thumbnailPreview && (
+              <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Thumbnail Preview
+                </label>
+                <img
+                  src={thumbnailPreview}
+                  alt="Video thumbnail"
+                  className="w-full aspect-video object-cover rounded border border-gray-200 dark:border-gray-600"
+                  onError={(e) => {
+                    // Hide preview if thumbnail fails to load
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
             
             {url && (
               <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
