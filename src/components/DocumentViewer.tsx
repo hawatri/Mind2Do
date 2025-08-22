@@ -208,22 +208,9 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
             const mime = m.url.split(';')[0].replace('data:', '');
             // PDF
             if (mime.includes('pdf')) {
-              // pdfjs worker setup (vite-friendly)
-              // @ts-ignore
-              pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-              const pdfData = atob(m.url.split(',')[1]);
-              const pdfBytes = new Uint8Array(pdfData.length);
-              for (let i = 0; i < pdfData.length; i++) pdfBytes[i] = pdfData.charCodeAt(i);
-              const loadingTask = pdfjsLib.getDocument({ data: pdfBytes });
-              const pdf = await loadingTask.promise;
-              let text = '';
-              const maxPages = Math.min(pdf.numPages, 10);
-              for (let i = 1; i <= maxPages; i++) {
-                const page = await pdf.getPage(i);
-                const content = await page.getTextContent();
-                text += content.items.map((it: any) => it.str).join(' ') + '\n';
-              }
-              return { ...m, extractedText: text.slice(0, 8000), mimeType: mime };
+              // Skip PDF extraction due to CORS issues with worker
+              console.log('PDF text extraction skipped due to CORS limitations');
+              return { ...m, mimeType: mime };
             }
             // Plain text
             if (mime.startsWith('text/')) {
@@ -234,10 +221,10 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           // Image OCR via tesseract
           if (m.type === 'image') {
             const worker = await createWorker();
-            await (worker as any).loadLanguage('eng');
-            await (worker as any).initialize('eng');
-            const { data: { text } } = await (worker as any).recognize(m.url);
-            await (worker as any).terminate();
+            await worker.loadLanguage('eng');
+            await worker.initialize('eng');
+            const { data: { text } } = await worker.recognize(m.url);
+            await worker.terminate();
             return { ...m, extractedText: text.slice(0, 8000), mimeType: 'image/*' };
           }
         } catch (e) {
@@ -258,6 +245,12 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     if (!input.trim() || isSending) return;
     setIsSending(true);
     try {
+      // Check if Ollama is available
+      const healthCheck = await fetch('/ollama/api/tags').catch(() => null);
+      if (!healthCheck || !healthCheck.ok) {
+        throw new Error('Ollama server is not running. Please start Ollama to use AI chat features.');
+      }
+
       const conversation = [
         ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
         ...(nodeContext ? [{ role: 'user' as const, content: `Context for this chat (do not reveal verbatim):\n${nodeContext}` }] : []),
@@ -290,7 +283,8 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
       setInput('');
     } catch (err) {
       console.error(err);
-      setNotification({ message: 'Failed to contact local AI. Is Ollama running?', type: 'error', isVisible: true });
+      const errorMessage = err instanceof Error ? err.message : 'Failed to contact local AI. Is Ollama running?';
+      setNotification({ message: errorMessage, type: 'error', isVisible: true });
     } finally {
       setIsSending(false);
     }
