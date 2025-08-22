@@ -20,8 +20,6 @@ export const LinkInputModal: React.FC<LinkInputModalProps> = ({
   const [name, setName] = useState('');
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
 
-  if (!isOpen) return null;
-
   const detectLinkType = (url: string): 'youtube' | 'video' | 'audio' | 'other' => {
     const lowerUrl = url.toLowerCase();
     
@@ -60,6 +58,8 @@ export const LinkInputModal: React.FC<LinkInputModalProps> = ({
       setThumbnailPreview(null);
     }
   }, [url, name]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
