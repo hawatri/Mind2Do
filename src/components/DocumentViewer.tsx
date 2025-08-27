@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, FileText, Image, Download, ExternalLink, File, MessageCircle, Play, Youtube, Music, Video, Link } from 'lucide-react';
+import { X, FileText, Image, Download, ExternalLink, File, MessageCircle, Play, Youtube, Music, Video, Link, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import { MindMapNode } from '../types';
 import { MediaPlayer } from './MediaPlayer';
 import { useFilePaths } from '../hooks/useFilePaths';
+import { useDocumentProcessor } from '../hooks/useDocumentProcessor';
 import * as pdfjsLib from 'pdfjs-dist';
 import { createWorker } from 'tesseract.js';
 import { Notification } from './Notification';
@@ -24,13 +25,14 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const [activeTab, setActiveTab] = useState<'media' | 'chat'>('media');
   const [selectedMediaForPlayer, setSelectedMediaForPlayer] = useState<any>(null);
   const [model, setModel] = useState<string>('deepseek-r1:1.5b');
-  const [systemPrompt] = useState<string>('You are a helpful assistant for a mindmap/todo app. Keep responses concise.');
+  const [systemPrompt] = useState<string>('You are a helpful assistant for a mindmap/todo app. Use the provided document context to give detailed, relevant answers.');
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant' | 'system'; content: string }[]>(selectedNode?.chat || []);
 
   useEffect(() => {
     // When selected node changes, swap chat log to that node's saved chat
     setMessages(selectedNode?.chat || []);
   }, [selectedNode?.id]);
+
   const [input, setInput] = useState<string>('');
   const [isSending, setIsSending] = useState<boolean>(false);
   const [notification, setNotification] = useState<{
@@ -38,7 +40,102 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     type: 'success' | 'error' | 'info';
     isVisible: boolean;
   }>({ message: '', type: 'info', isVisible: false });
+
+  // Document processing states
+  const [processedDocuments, setProcessedDocuments] = useState<Map<string, any>>(new Map());
+  const [isAutoProcessing, setIsAutoProcessing] = useState(false);
+
   const { lastOpenedPdf, openFile, openBase64File, getFilePath } = useFilePaths();
+  const { processDocument, isProcessing, processingProgress } = useDocumentProcessor();
+
+  // Auto-process documents when node changes or chat opens
+  useEffect(() => {
+    if (selectedNode && activeTab === 'chat') {
+      autoProcessDocuments();
+    }
+  }, [selectedNode?.id, activeTab]);
+
+  const autoProcessDocuments = async () => {
+    if (!selectedNode || isAutoProcessing) return;
+    
+    setIsAutoProcessing(true);
+    const unprocessedMedia = selectedNode.media.filter(media => 
+      !processedDocuments.has(media.id) && 
+      (media.type === 'document' || media.type === 'image') &&
+      media.url.startsWith('data:')
+    );
+
+    if (unprocessedMedia.length === 0) {
+      setIsAutoProcessing(false);
+      return;
+    }
+
+    setNotification({
+      message: `Processing ${unprocessedMedia.length} documents for AI context...`,
+      type: 'info',
+      isVisible: true
+    });
+
+    const processed = new Map(processedDocuments);
+
+    for (const media of unprocessedMedia) {
+      try {
+        const result = await processDocument(media);
+        processed.set(media.id, result);
+        
+        setNotification({
+          message: `Processed: ${media.name} (${Math.round(result.confidence * 100)}% confidence)`,
+          type: 'success',
+          isVisible: true
+        });
+        
+      } catch (error) {
+        console.error(`Failed to process ${media.name}:`, error);
+        setNotification({
+          message: `Failed to process: ${media.name}`,
+          type: 'error',
+          isVisible: true
+        });
+      }
+    }
+
+    setProcessedDocuments(processed);
+    setIsAutoProcessing(false);
+    
+    setNotification({
+      message: 'Document processing completed! AI now has full context.',
+      type: 'success',
+      isVisible: true
+    });
+  };
+
+  const handleManualProcess = async (media: any) => {
+    try {
+      setNotification({
+        message: `Processing ${media.name}...`,
+        type: 'info',
+        isVisible: true
+      });
+
+      const result = await processDocument(media);
+      const processed = new Map(processedDocuments);
+      processed.set(media.id, result);
+      setProcessedDocuments(processed);
+
+      setNotification({
+        message: `Successfully processed ${media.name} (${Math.round(result.confidence * 100)}% confidence)`,
+        type: 'success',
+        isVisible: true
+      });
+
+    } catch (error) {
+      setNotification({
+        message: `Failed to process ${media.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        type: 'error',
+        isVisible: true
+      });
+    }
+  };
 
   const handleMediaClick = (mediaId: string) => {
     const media = selectedNode?.media.find(m => m.id === mediaId);
@@ -178,16 +275,33 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     }
   };
 
+  // Enhanced context building with processed documents
   const nodeContext = useMemo(() => {
     if (!selectedNode) return '';
-    // Build retrieval context from node media (extractedText)
-    const docs = (selectedNode.media || [])
-      .map(m => m.extractedText)
+    
+    let context = `NODE INFORMATION:
+Title: ${selectedNode.title}
+Description: ${selectedNode.description}`;
+
+    // Add processed document context
+    const processedDocs = selectedNode.media
+      .map(media => processedDocuments.get(media.id))
       .filter(Boolean)
-      .slice(0, 3) // limit
-      .join('\n---\n');
-    return `Selected Node\nTitle: ${selectedNode.title}\nDescription: ${selectedNode.description}` + (docs ? `\n\nRelevant docs:\n${docs}` : '');
-  }, [selectedNode]);
+      .sort((a, b) => b.confidence - a.confidence) // Sort by confidence
+      .slice(0, 3); // Top 3 most confident extractions
+
+    if (processedDocs.length > 0) {
+      context += '\n\nDOCUMENT CONTENT:';
+      processedDocs.forEach((doc, index) => {
+        context += `\n\n--- Document ${index + 1} (${Math.round(doc.confidence * 100)}% confidence) ---`;
+        context += `\nSummary: ${doc.summary}`;
+        context += `\nKey terms: ${doc.keywords.join(', ')}`;
+        context += `\nFull text: ${doc.text.slice(0, 2000)}`; // Limit text length
+      });
+    }
+
+    return context;
+  }, [selectedNode, processedDocuments]);
 
   useEffect(() => {
     const handler = () => setActiveTab('chat');
@@ -195,7 +309,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     return () => window.removeEventListener('mind2do-open-chat', handler as EventListener);
   }, []);
 
-  // On mount or node change, extract text from media where missing
+  // On mount or node change, extract text from media where missing (keeping original logic as fallback)
   useEffect(() => {
     const run = async () => {
       if (!selectedNode) return;
@@ -251,9 +365,10 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         throw new Error('Ollama server is not running. Please start Ollama to use AI chat features.');
       }
 
+      // Build conversation with enhanced context
       const conversation = [
         ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
-        ...(nodeContext ? [{ role: 'user' as const, content: `Context for this chat (do not reveal verbatim):\n${nodeContext}` }] : []),
+        ...(nodeContext ? [{ role: 'user' as const, content: `CONTEXT (do not mention this directly, use it to inform your responses):\n${nodeContext}` }] : []),
         ...messages,
         { role: 'user' as const, content: input.trim() },
       ];
@@ -265,6 +380,11 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
           model,
           messages: conversation.map(m => ({ role: m.role, content: m.content })),
           stream: false,
+          options: {
+            temperature: 0.7,
+            top_p: 0.9,
+            max_tokens: 1000,
+          }
         }),
       });
 
@@ -295,52 +415,110 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   return (
     <>
       {/* Backdrop */}
-             <div 
-         className={`fixed inset-0 bg-black transition-all duration-700 ease-out z-40 ${
-           isOpen ? 'bg-opacity-50 backdrop-blur-sm' : 'bg-opacity-0 pointer-events-none backdrop-blur-none'
-         }`}
-         onClick={onClose}
-         onTouchEnd={onClose}
-       />
+      <div 
+        className={`fixed inset-0 bg-black transition-all duration-700 ease-out z-40 ${
+          isOpen ? 'bg-opacity-50 backdrop-blur-sm' : 'bg-opacity-0 pointer-events-none backdrop-blur-none'
+        }`}
+        onClick={onClose}
+        onTouchEnd={onClose}
+      />
       
       {/* Slide-out menu */}
-             <div className={`fixed right-0 top-0 h-full w-96 sm:w-[30rem] bg-white dark:bg-gray-800 shadow-2xl transform transition-all duration-700 ease-out z-50 ${
-         isOpen ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-95'
-       }`}>
-                 {/* Header */}
-                   <div className={`flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 transition-all duration-800 ease-out ${
-            isOpen ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'
-          }`}>
-           <div className="flex items-center gap-3">
-             <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
-               Documents & AI
-             </h2>
-             <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 rounded p-0.5">
-               <button
-                 className={`px-2 py-1 text-xs rounded ${activeTab === 'media' ? 'bg-white dark:bg-gray-800 shadow text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-300'}`}
-                 onClick={() => setActiveTab('media')}
-               >Media</button>
-               <button
-                 className={`px-2 py-1 text-xs rounded ${activeTab === 'chat' ? 'bg-white dark:bg-gray-800 shadow text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-300'}`}
-                 onClick={() => setActiveTab('chat')}
-               >Chat</button>
-             </div>
-           </div>
-                                 <button
-              onClick={onClose}
-              onTouchEnd={onClose}
-              className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-all duration-300 hover:scale-110 hover:rotate-12"
-            >
-             <X className="w-4 h-4 sm:w-5 sm:h-5" />
-           </button>
+      <div className={`fixed right-0 top-0 h-full w-96 sm:w-[30rem] bg-white dark:bg-gray-800 shadow-2xl transform transition-all duration-700 ease-out z-50 ${
+        isOpen ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-95'
+      }`}>
+        {/* Header */}
+        <div className={`flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 transition-all duration-800 ease-out ${
+          isOpen ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'
+        }`}>
+          <div className="flex items-center gap-3">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Documents & AI
+            </h2>
+            <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 rounded p-0.5">
+              <button
+                className={`px-2 py-1 text-xs rounded ${activeTab === 'media' ? 'bg-white dark:bg-gray-800 shadow text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-300'}`}
+                onClick={() => setActiveTab('media')}
+              >Media</button>
+              <button
+                className={`px-2 py-1 text-xs rounded ${activeTab === 'chat' ? 'bg-white dark:bg-gray-800 shadow text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-300'}`}
+                onClick={() => setActiveTab('chat')}
+              >Chat</button>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            onTouchEnd={onClose}
+            className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-all duration-300 hover:scale-110 hover:rotate-12"
+          >
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
         </div>
 
-                 {/* Content */}
-                   <div className={`flex-1 overflow-y-auto p-3 sm:p-4 transition-all duration-700 ease-out ${
-            isOpen ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95'
-          }`}>
+        {/* Content */}
+        <div className={`flex-1 overflow-y-auto p-3 sm:p-4 transition-all duration-700 ease-out ${
+          isOpen ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95'
+        }`}>
           {activeTab === 'chat' ? (
             <div className="flex flex-col gap-3 h-[calc(100vh-7rem)]">
+              {/* Processing Status */}
+              {(isAutoProcessing || isProcessing) && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <RefreshCw className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin" />
+                    <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      Processing Documents...
+                    </span>
+                  </div>
+                  <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                      style={{ width: `${processingProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Document Processing Status */}
+              {selectedNode && selectedNode.media.length > 0 && (
+                <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      Document Context ({processedDocuments.size}/{selectedNode.media.length})
+                    </span>
+                    <button
+                      onClick={autoProcessDocuments}
+                      className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                      disabled={isAutoProcessing}
+                    >
+                      Reprocess All
+                    </button>
+                  </div>
+                  
+                  {selectedNode.media.map(media => {
+                    const processed = processedDocuments.get(media.id);
+                    return (
+                      <div key={media.id} className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        <span className="truncate flex-1">{media.name}</span>
+                        <div className="flex items-center gap-2">
+                          {processed ? (
+                            <CheckCircle className="w-3 h-3 text-green-500" />
+                          ) : (
+                            <button
+                              onClick={() => handleManualProcess(media)}
+                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                              disabled={isProcessing}
+                            >
+                              <AlertCircle className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               <div className="flex items-center gap-2">
                 <MessageCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">AI Chat</span>
@@ -349,24 +527,31 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
                 >
-                  
+                  <option value="deepseek-r1:1.5b">DeepSeek R1 1.5B</option>
                   <option value="deepseek-r1:8b">DeepSeek R1 8B</option>
                   <option value="gemma3:12b">Gemma 3 12B</option>
                   <option value="gemma3:4b">Gemma 3 4B</option>
-                  
+                  <option value="llama3.1:8b">LLama 3.1</option>
                 </select>
               </div>
 
               <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
-                <div className="text-xs text-gray-700 dark:text-gray-300 mb-1">Context</div>
+                <div className="text-xs text-gray-700 dark:text-gray-300 mb-1">
+                  Available Context ({processedDocuments.size} processed documents)
+                </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap max-h-24 overflow-auto">
-                  {selectedNode ? `Title: ${selectedNode.title}\nDescription: ${selectedNode.description}` : 'No node selected'}
+                  {selectedNode ? 
+                    `Title: ${selectedNode.title}\nDescription: ${selectedNode.description}${processedDocuments.size > 0 ? `\n+ ${processedDocuments.size} processed documents` : ''}` 
+                    : 'No node selected'
+                  }
                 </div>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-3 border border-gray-200 dark:border-gray-700 rounded p-3 bg-white dark:bg-gray-800">
                 {messages.length === 0 && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Ask about the title/description. E.g., "Explain the description" or "Elaborate the description".</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Ask about your documents and node content. The AI has access to all processed document text.
+                  </div>
                 )}
                 {messages.map((m, idx) => (
                   <div key={idx} className={`text-sm whitespace-pre-wrap ${m.role === 'assistant' ? 'text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}`}>
@@ -379,7 +564,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
               <div className="flex gap-2">
                 <input
                   className="flex-1 px-3 py-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                  placeholder={selectedNode ? 'Type your question...' : 'Select a node to chat'}
+                  placeholder={selectedNode ? 'Ask about your documents...' : 'Select a node to chat'}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendMessage(); } }}
@@ -394,21 +579,21 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
             </div>
           ) : selectedNode ? (
             <div>
-                             {/* Node Info */}
-                               <div className={`mb-6 p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transform transition-all duration-500 hover:scale-[1.02] hover:shadow-md ${
-                  isOpen ? 'animate-slideInFromBottom opacity-100' : 'opacity-0 translate-y-4'
-                }`}
-               style={{
-                 animationDelay: '200ms',
-                 animation: isOpen ? 'slideInFromBottom 0.6s ease-out forwards' : 'none'
-               }}>
-                 <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2 transform transition-all duration-300 hover:translate-x-1">
-                   {selectedNode.title}
-                 </h3>
-                 <p className="text-sm text-gray-600 dark:text-gray-400 transform transition-all duration-300 hover:translate-x-1">
-                   {selectedNode.description}
-                 </p>
-               </div>
+              {/* Node Info */}
+              <div className={`mb-6 p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transform transition-all duration-500 hover:scale-[1.02] hover:shadow-md ${
+                isOpen ? 'animate-slideInFromBottom opacity-100' : 'opacity-0 translate-y-4'
+              }`}
+              style={{
+                animationDelay: '200ms',
+                animation: isOpen ? 'slideInFromBottom 0.6s ease-out forwards' : 'none'
+              }}>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2 transform transition-all duration-300 hover:translate-x-1">
+                  {selectedNode.title}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 transform transition-all duration-300 hover:translate-x-1">
+                  {selectedNode.description}
+                </p>
+              </div>
 
               {/* Last Opened PDF Quick Access */}
               {lastOpenedPdf && (
@@ -437,165 +622,160 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
                 </div>
               )}
 
-              {/* Removed Add File Path UI */}
-
               {/* Media Files */}
               {selectedNode.media.length > 0 ? (
                 <div
                 className="space-y-3 media-list"
                 style={{
                 overflowY: 'auto',
-                                  maxHeight: '700px', // Adjust this value as needed
-                                  // Inline styles to re-enable scrollbars
+                                  maxHeight: '700px',
                                   WebkitOverflowScrolling: 'touch',
                 }}>
                   <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3">
                     Attachments ({selectedNode.media.length})
                   </h4>
                   
-                                     {selectedNode.media.map((media, index) => (
-                                           <div 
-                        key={media.id} 
-                        className={`border border-gray-200 dark:border-gray-600 rounded-lg p-2 sm:p-3 transform transition-all duration-500 hover:scale-[1.02] hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-500 ${
-                          isOpen ? 'animate-slideInFromRight opacity-100' : 'opacity-0 translate-x-8'
-                        }`}
-                       style={{
-                         animationDelay: `${400 + (index * 150)}ms`,
-                         animation: isOpen ? 'slideInFromRight 0.8s ease-out forwards' : 'none'
-                       }}
-                     >
-                      {/* Media Header */}
-                      <div className="flex items-center gap-3 mb-3">
-                        {getMediaIcon(media)}
-                                                 <div className="flex-1 min-w-0">
-                           <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                             {media.name}
-                           </p>
-                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                             {getMediaTypeLabel(media)}
-                             {media.size && ` • ${formatFileSize(media.size)}`}
-                           </p>
-                         </div>
-                      </div>
-
-                      {/* Media Preview/Content */}
-                      {media.type === 'image' && (
-                                                 <div className="mb-3 transform transition-all duration-300 hover:scale-[1.02]">
-                           <img
-                             src={media.url}
-                             alt={media.name}
-                             className="w-full h-32 object-cover rounded border border-gray-200 dark:border-gray-600 cursor-pointer hover:opacity-90 transition-all duration-300 hover:border-blue-400 dark:hover:border-blue-500"
-                             onClick={() => handleMediaClick(media.id)}
-                             onTouchEnd={() => handleMediaClick(media.id)}
-                           />
-                         </div>
-                      )}
-
-                      {/* File Size Warning */}
-                      {media.size && media.size > 5 * 1024 * 1024 && media.type !== 'link' && (
-                        <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-700 dark:text-yellow-300">
-                          ⚠️ Large file ({formatFileSize(media.size)}). Opening may be slow. Consider using file paths for better performance.
-                        </div>
-                      )}
-
-                      {/* Action Buttons */}
-                      <div className="flex gap-2">
-                        {media.type === 'link' && (
-                          <button
-                            onClick={() => handleMediaClick(media.id)}
-                            onTouchEnd={() => handleMediaClick(media.id)}
-                            className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-all duration-300 hover:scale-105 hover:shadow-md transform"
-                          >
-                            <Play className="w-3 h-3 transform transition-all duration-300 hover:scale-110" />
-                            Play
-                          </button>
-                        )}
-                                                 <button
-                           onClick={() => media.type === 'link' ? window.open(media.url, '_blank') : handleDownload(media)}
-                           onTouchEnd={() => media.type === 'link' ? window.open(media.url, '_blank') : handleDownload(media)}
-                           className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-all duration-300 hover:scale-105 hover:shadow-md transform"
-                         >
-                           {media.type === 'link' ? (
-                             <>
-                               <ExternalLink className="w-3 h-3 transform transition-all duration-300 hover:scale-110" />
-                               Open
-                             </>
-                           ) : (
-                             <>
-                               <Download className="w-3 h-3 transform transition-all duration-300 hover:scale-110" />
-                               Download
-                             </>
-                           )}
-                         </button>
-                         {media.type !== 'link' && (
-                           <button
-                           onClick={() => handleOpenInNewTab(media)}
-                           onTouchEnd={() => handleOpenInNewTab(media)}
-                           className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-all duration-300 hover:scale-105 hover:shadow-md transform"
-                         >
-                           <ExternalLink className="w-3 h-3 transform transition-all duration-300 hover:scale-110" />
-                           Open
-                         </button>
-                         )}
-                      </div>
+                  {selectedNode.media.map((media, index) => (
+                    <div 
+                      key={media.id} 
+                      className={`border border-gray-200 dark:border-gray-600 rounded-lg p-2 sm:p-3 transform transition-all duration-500 hover:scale-[1.02] hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-500 ${
+                        isOpen ? 'animate-slideInFromRight opacity-100' : 'opacity-0 translate-x-8'
+                      }`}
+                     style={{
+                       animationDelay: `${400 + (index * 150)}ms`,
+                       animation: isOpen ? 'slideInFromRight 0.8s ease-out forwards' : 'none'
+                     }}
+                   >
+                    {/* Media Header */}
+                    <div className="flex items-center gap-3 mb-3">
+                      {getMediaIcon(media)}
+                      <div className="flex-1 min-w-0">
+                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                           {media.name}
+                         </p>
+                         <p className="text-xs text-gray-500 dark:text-gray-400">
+                           {getMediaTypeLabel(media)}
+                           {media.size && ` • ${formatFileSize(media.size)}`}
+                         </p>
+                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                                 <div className="text-center py-8 text-gray-500 dark:text-gray-400 transform transition-all duration-500 hover:scale-105">
-                   <FileText className="w-12 h-12 mx-auto mb-3 opacity-50 transform transition-all duration-500 hover:scale-110 hover:opacity-75" />
-                   <p className="transform transition-all duration-300 hover:translate-y-1">No documents or media attached to this node.</p>
-                 </div>
-              )}
-            </div>
-          ) : (
-                         <div className="text-center py-8 text-gray-500 dark:text-gray-400 transform transition-all duration-500 hover:scale-105">
-               <FileText className="w-12 h-12 mx-auto mb-3 opacity-50 transform transition-all duration-500 hover:scale-110 hover:opacity-75" />
-               <p className="transform transition-all duration-300 hover:translate-y-1">Select a node to view its documents and media.</p>
-             </div>
+
+                    {/* Media Preview/Content */}
+                    {media.type === 'image' && (
+                      <div className="mb-3 transform transition-all duration-300 hover:scale-[1.02]">
+                         <img
+                           src={media.url}
+                           alt={media.name}
+                           className="w-full h-32 object-cover rounded border border-gray-200 dark:border-gray-600 cursor-pointer hover:opacity-90 transition-all duration-300 hover:border-blue-400 dark:hover:border-blue-500"
+                           onClick={() => handleMediaClick(media.id)}
+                           onTouchEnd={() => handleMediaClick(media.id)}
+                         />
+                       </div>
+                    )}
+
+                    {/* File Size Warning */}
+                    {media.size && media.size > 5 * 1024 * 1024 && media.type !== 'link' && (
+                      <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-700 dark:text-yellow-300">
+                        ⚠️ Large file ({formatFileSize(media.size)}). Opening may be slow. Consider using file paths for better performance.
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      {media.type === 'link' && (
+                        <button
+                          onClick={() => handleMediaClick(media.id)}
+                          onTouchEnd={() => handleMediaClick(media.id)}
+                          className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-all duration-300 hover:scale-105 hover:shadow-md transform"
+                        >
+                          <Play className="w-3 h-3 transform transition-all duration-300 hover:scale-110" />
+                          Play
+                        </button>
+                      )}
+                      <button
+                         onClick={() => media.type === 'link' ? window.open(media.url, '_blank') : handleDownload(media)}
+                         onTouchEnd={() => media.type === 'link' ? window.open(media.url, '_blank') : handleDownload(media)}
+                         className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-all duration-300 hover:scale-105 hover:shadow-md transform"
+                       >
+                         {media.type === 'link' ? (
+                           <>
+                             <ExternalLink className="w-3 h-3 transform transition-all duration-300 hover:scale-110" />
+                             Open
+                           </>
+                         ) : (
+                           <>
+                             <Download className="w-3 h-3 transform transition-all duration-300 hover:scale-110" />
+                             Download
+                           </>
+                         )}
+                       </button>
+                       {media.type !== 'link' && (
+                         <button
+                         onClick={() => handleOpenInNewTab(media)}
+                         onTouchEnd={() => handleOpenInNewTab(media)}
+                         className="flex-1 flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-all duration-300 hover:scale-105 hover:shadow-md transform"
+                       >
+                         <ExternalLink className="w-3 h-3 transform transition-all duration-300 hover:scale-110" />
+                         Open
+                       </button>
+                       )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400 transform transition-all duration-500 hover:scale-105">
+                 <FileText className="w-12 h-12 mx-auto mb-3 opacity-50 transform transition-all duration-500 hover:scale-110 hover:opacity-75" />
+                 <p className="transform transition-all duration-300 hover:translate-y-1">No documents or media attached to this node.</p>
+               </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400 transform transition-all duration-500 hover:scale-105">
+             <FileText className="w-12 h-12 mx-auto mb-3 opacity-50 transform transition-all duration-500 hover:scale-110 hover:opacity-75" />
+             <p className="transform transition-all duration-300 hover:translate-y-1">Select a node to view its documents and media.</p>
+           </div>
+        )}
+      </div>
+    </div>
+
+    {/* Full-size Media Viewer */}
+    {selectedMedia && (
+      <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="relative max-w-4xl max-h-full">
+          <button
+             onClick={() => setSelectedMedia(null)}
+             onTouchEnd={() => setSelectedMedia(null)}
+             className="absolute top-4 right-4 p-2 bg-black bg-opacity-50 rounded-full text-white hover:bg-opacity-75 transition-colors z-10"
+           >
+            <X className="w-6 h-6" />
+          </button>
+          
+          {selectedNode?.media.find(m => m.id === selectedMedia)?.type === 'image' && (
+            <img
+              src={selectedNode.media.find(m => m.id === selectedMedia)?.url}
+              alt={selectedNode.media.find(m => m.id === selectedMedia)?.name}
+              className="max-w-full max-h-full object-contain"
+            />
           )}
         </div>
       </div>
+    )}
 
-      {/* Full-size Media Viewer */}
-      {selectedMedia && (
-        <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="relative max-w-4xl max-h-full">
-                         <button
-               onClick={() => setSelectedMedia(null)}
-               onTouchEnd={() => setSelectedMedia(null)}
-               className="absolute top-4 right-4 p-2 bg-black bg-opacity-50 rounded-full text-white hover:bg-opacity-75 transition-colors z-10"
-             >
-              <X className="w-6 h-6" />
-            </button>
-            
-            {selectedNode?.media.find(m => m.id === selectedMedia)?.type === 'image' && (
-              <img
-                src={selectedNode.media.find(m => m.id === selectedMedia)?.url}
-                alt={selectedNode.media.find(m => m.id === selectedMedia)?.name}
-                className="max-w-full max-h-full object-contain"
-              />
-            )}
-          </div>
-        </div>
-      )}
+    {/* Media Player */}
+    <MediaPlayer
+      media={selectedMediaForPlayer}
+      isOpen={!!selectedMediaForPlayer}
+      onClose={() => setSelectedMediaForPlayer(null)}
+    />
 
-      {/* Media Player */}
-      <MediaPlayer
-        media={selectedMediaForPlayer}
-        isOpen={!!selectedMediaForPlayer}
-        onClose={() => setSelectedMediaForPlayer(null)}
-      />
-
-      {/* No File Path Input Modal (deprecated) */}
-
-      {/* Notification */}
-      <Notification
-        message={notification.message}
-        type={notification.type}
-        isVisible={notification.isVisible}
-        onClose={() => setNotification(prev => ({ ...prev, isVisible: false }))}
-      />
-    </>
-  );
+    {/* Notification */}
+    <Notification
+      message={notification.message}
+      type={notification.type}
+      isVisible={notification.isVisible}
+      onClose={() => setNotification(prev => ({ ...prev, isVisible: false }))}
+    />
+  </>
+);
 };
