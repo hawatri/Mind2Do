@@ -475,36 +475,37 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
               </div>
             )}
             
-            <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-gray-50 dark:bg-gray-700/30">
-              {isEditingDescription ? (
-                <textarea
-                  ref={descriptionInputRef}
-                  defaultValue={node.description}
-                  className={`w-full bg-transparent border-none outline-none resize-none text-sm ${getTextColorClass(node.formatting.textColor)} opacity-80`}
-                  rows={4}
-                  placeholder="Click to edit description..."
-                  onBlur={(e) => handleDescriptionSubmit(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleDescriptionSubmit((e.target as HTMLTextAreaElement).value);
-                    } else if (e.key === 'Escape') {
-                      setIsEditingDescription(false);
-                    }
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <div
-                  className={`${getTextColorClass(node.formatting.textColor)} break-words cursor-text text-sm opacity-80 leading-relaxed`}
-                  onDoubleClick={() => !isHandTool && setIsEditingDescription(true)}
-                  onTouchEnd={() => !isHandTool && setIsEditingDescription(true)}
-                >
-                  {node.description}
-                </div>
-              )}
-            </div>
+
+<div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-gray-50 dark:bg-gray-700/30">
+  {isEditingDescription ? (
+    <textarea
+      ref={descriptionInputRef}
+      defaultValue={node.description}
+      className={`w-full bg-transparent border-none outline-none resize-none text-sm ${getTextColorClass(node.formatting.textColor)} opacity-80`}
+      rows={4}
+      placeholder="Click to edit description..."
+      onBlur={(e) => handleDescriptionSubmit(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          handleDescriptionSubmit((e.target as HTMLTextAreaElement).value);
+        } else if (e.key === 'Escape') {
+          setIsEditingDescription(false);
+        }
+      }}
+      onClick={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+    />
+  ) : (
+    <div
+      className={`${getTextColorClass(node.formatting.textColor)} break-words cursor-text text-sm opacity-80 leading-relaxed whitespace-pre-wrap`}
+      onDoubleClick={() => !isHandTool && setIsEditingDescription(true)}
+      onTouchEnd={() => !isHandTool && setIsEditingDescription(true)}
+    >
+      {node.description}
+    </div>
+  )}
+</div>
           </div>
           
           <button
