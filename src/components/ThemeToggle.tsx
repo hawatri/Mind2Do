@@ -8,13 +8,13 @@ export const ThemeToggle: React.FC = () => {
   return (
     <button
       onClick={toggleTheme}
-      className="fixed top-4 right-4 p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200 dark:border-gray-700 z-50"
+      className="fixed top-6 right-6 z-50 p-3 rounded-xl glass hover:glass-strong transition-all duration-300 hover:scale-105 hover:rotate-12"
       aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {isDarkMode ? (
-        <Sun className="w-5 h-5 text-yellow-500" />
+        <Sun className="w-5 h-5 text-yellow-400 drop-shadow-lg" />
       ) : (
-        <Moon className="w-5 h-5 text-gray-600" />
+        <Moon className="w-5 h-5 text-indigo-600 drop-shadow-lg" />
       )}
     </button>
   );

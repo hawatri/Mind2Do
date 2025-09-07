@@ -216,10 +216,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       {/* Search Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed top-4 right-20 p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200 dark:border-gray-700 z-50"
+        className="fixed top-6 right-20 p-3 rounded-xl glass hover:glass-strong transition-all duration-300 z-50 hover:scale-105 hover:rotate-3"
         title="Search nodes (Ctrl+K)"
       >
-        <Search className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+        <Search className="w-5 h-5 text-gray-700 dark:text-gray-300 drop-shadow-sm" />
       </button>
 
       {/* Search Modal */}
@@ -227,16 +227,16 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-black/30 backdrop-blur-md z-50"
             onClick={() => setIsOpen(false)}
           />
           
           {/* Search Container */}
           <div className="fixed top-20 left-1/2 transform -translate-x-1/2 w-full max-w-2xl mx-4 z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="glass-strong rounded-2xl shadow-2xl overflow-hidden">
               {/* Search Input */}
-              <div className="flex items-center gap-3 p-4 border-b border-gray-200 dark:border-gray-700">
-                <Search className="w-5 h-5 text-gray-400" />
+              <div className="flex items-center gap-3 p-4 border-b border-white/20 dark:border-gray-600/30">
+                <Search className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                 <input
                   ref={searchInputRef}
                   type="text"
@@ -244,11 +244,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Search nodes by title, description, or media..."
-                  className="flex-1 bg-transparent outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                  className="flex-1 bg-transparent outline-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 font-medium"
                 />
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
+                  className="p-1 rounded-lg hover:bg-white/20 dark:hover:bg-gray-700/50 text-gray-500 dark:text-gray-400 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -257,21 +257,21 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               {/* Search Results */}
               <div ref={resultsRef} className="max-h-96 overflow-y-auto">
                 {isSearching && (
-                  <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                  <div className="p-4 text-center text-gray-600 dark:text-gray-400">
                     <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
                     Searching...
                   </div>
                 )}
 
                 {!isSearching && searchQuery && searchResults.length === 0 && (
-                  <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                  <div className="p-4 text-center text-gray-600 dark:text-gray-400">
                     No nodes found matching "{searchQuery}"
                   </div>
                 )}
 
                 {!isSearching && searchResults.length > 0 && (
                   <div className="py-2">
-                    <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700">
+                    <div className="px-4 py-2 text-xs text-gray-600 dark:text-gray-400 bg-white/10 dark:bg-gray-700/30">
                       {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found
                     </div>
                     

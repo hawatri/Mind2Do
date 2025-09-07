@@ -66,10 +66,10 @@ export const FileOperations: React.FC<FileOperationsProps> = ({
   };
 
   return (
-    <div className="fixed top-4 left-4 flex gap-2 z-50">
+    <div className="fixed top-6 left-6 flex gap-3 z-50">
       <button
         onClick={onSave}
-        className="p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200 dark:border-gray-700 text-green-600 hover:text-green-700"
+        className="p-3 rounded-xl glass hover:glass-strong transition-all duration-300 text-green-600 hover:text-green-700 hover:scale-105 hover:rotate-3"
         title="Save to browser storage"
       >
         <Save className="w-5 h-5" />
@@ -77,7 +77,7 @@ export const FileOperations: React.FC<FileOperationsProps> = ({
       
       <button
         onClick={handleDownload}
-        className="p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200 dark:border-gray-700 text-blue-600 hover:text-blue-700"
+        className="p-3 rounded-xl glass hover:glass-strong transition-all duration-300 text-blue-600 hover:text-blue-700 hover:scale-105 hover:rotate-3"
         title="Download mindmap"
       >
         <Download className="w-5 h-5" />
@@ -85,7 +85,7 @@ export const FileOperations: React.FC<FileOperationsProps> = ({
       
       <button
         onClick={handleUpload}
-        className="p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200 dark:border-gray-700 text-purple-600 hover:text-purple-700"
+        className="p-3 rounded-xl glass hover:glass-strong transition-all duration-300 text-purple-600 hover:text-purple-700 hover:scale-105 hover:rotate-3"
         title="Upload mindmap"
       >
         <Upload className="w-5 h-5" />

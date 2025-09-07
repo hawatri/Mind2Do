@@ -762,18 +762,18 @@ export const MindMap: React.FC = () => {
       <button
         onClick={() => setIsDocumentViewerOpen(true)}
         onTouchEnd={() => setIsDocumentViewerOpen(true)}
-        className="fixed top-20 right-0 p-2 sm:p-3 bg-blue-500 hover:bg-blue-600 text-white rounded-l-lg shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out transform hover:translate-x-1 flex items-center gap-1 sm:gap-2 z-40 group"
+        className="fixed top-20 right-0 p-3 sm:p-4 glass-strong text-blue-600 dark:text-blue-400 rounded-l-2xl shadow-xl hover:shadow-2xl transition-all duration-300 ease-in-out transform hover:translate-x-1 hover:scale-105 flex items-center gap-2 z-40 group"
         title="View Documents & Media"
       >
-        <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
-        <span className="text-xs sm:text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
+        <FileText className="w-4 h-4 sm:w-5 sm:h-5 drop-shadow-sm" />
+        <span className="text-xs sm:text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
           Documents
         </span>
-        <div className="absolute right-0 top-0 w-1 h-full bg-blue-400 rounded-l-full transition-all duration-300 group-hover:w-2"></div>
+        <div className="absolute right-0 top-0 w-1 h-full bg-gradient-to-b from-blue-400 to-blue-600 rounded-l-full transition-all duration-300 group-hover:w-2"></div>
       </button>
       
               <div
-          className={`mindmap-container relative w-full h-full bg-gray-50 dark:bg-gray-900 overflow-hidden ${
+          className={`mindmap-container relative w-full h-full overflow-hidden ${
             isHandTool ? 'cursor-grab' : 'cursor-default'
           } ${isDraggingCanvas ? 'cursor-grabbing' : ''}`}
           onMouseDown={handleCanvasMouseDown}
@@ -887,10 +887,10 @@ export const MindMap: React.FC = () => {
             setNodes(prev => [...prev, newNode]);
             setSelectedNodeId(newId);
           }}
-          className="fixed bottom-8 right-4 sm:right-8 w-12 h-12 sm:w-14 sm:h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-40"
+          className="fixed bottom-8 right-4 sm:right-8 w-14 h-14 sm:w-16 sm:h-16 glass-strong text-blue-600 dark:text-blue-400 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center justify-center z-40 hover:scale-110 hover:rotate-12"
           title="Add new root task"
         >
-          <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
+          <Plus className="w-6 h-6 sm:w-7 sm:h-7 drop-shadow-lg" />
         </button>
 
         <button
@@ -924,13 +924,13 @@ export const MindMap: React.FC = () => {
               console.error('Failed to clear storage:', error);
             }
           }}
-          className="fixed bottom-20 right-4 sm:bottom-8 sm:right-24 w-12 h-12 sm:w-14 sm:h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-40"
+          className="fixed bottom-20 right-4 sm:bottom-8 sm:right-24 w-14 h-14 sm:w-16 sm:h-16 glass-strong text-blue-600 dark:text-blue-400 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 flex items-center justify-center z-40 hover:scale-110 hover:rotate-12"
           title="Create new mindmap (clears everything)"
         >
-          <span className="text-xs sm:text-sm font-semibold">New</span>
+          <span className="text-xs sm:text-sm font-bold drop-shadow-sm">New</span>
         </button>
         
-        <div className="fixed bottom-4 right-4 text-xs text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 px-2 py-1 rounded shadow">
+        <div className="fixed bottom-4 right-4 text-xs text-gray-600 dark:text-gray-400 glass px-3 py-2 rounded-xl shadow-lg">
           Hold Ctrl/Cmd + Click to select multiple nodes
         </div>
       </div>

@@ -389,19 +389,18 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
       <div
         className={`
           ${inlinePlayerMedia ? 'min-w-80 max-w-[500px]' : 'min-w-64 max-w-96'} 
-          p-4 rounded-lg shadow-lg border-2 transition-all duration-300 pointer-events-auto
+          p-4 rounded-2xl transition-all duration-300 pointer-events-auto relative
           ${isSelected 
-            ? 'border-blue-500 shadow-blue-100 dark:shadow-blue-900/50' 
+            ? 'node-glass border-2 border-blue-400/50 shadow-lg shadow-blue-500/20' 
             : isMultiSelected
-            ? 'border-green-500 shadow-green-100 dark:shadow-green-900/50'
-            : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+            ? 'node-glass border-2 border-green-400/50 shadow-lg shadow-green-500/20'
+            : 'node-glass hover:scale-[1.02]'
           }
           ${node.completed 
-            ? 'bg-green-100 dark:bg-green-900/30' 
-            : 'bg-white dark:bg-gray-800'
+            ? 'bg-gradient-to-br from-green-100/80 to-emerald-100/80 dark:from-green-900/40 dark:to-emerald-900/40' 
+            : ''
           }
           ${getHighlightClass(node.formatting.highlight)}
-          relative
         `}
         onClick={(e) => {
           e.stopPropagation();
@@ -422,9 +421,6 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
           onNodeSelect(node.id);
         }}
       >
-        {/* Background overlay to hide connection lines */}
-        <div className="absolute inset-0 bg-white dark:bg-gray-800 rounded-lg -z-10"></div>
-        
         <div className="flex items-start gap-3 mb-3">
           <button
             onClick={(e) => {
@@ -436,10 +432,10 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
               onNodeUpdate(node.id, { completed: !node.completed });
             }}
             className={`
-              flex-shrink-0 w-5 h-5 rounded border-2 transition-all duration-200 flex items-center justify-center
+              flex-shrink-0 w-5 h-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center hover:scale-110
               ${node.completed 
-                ? 'bg-green-600 border-green-600 text-white' 
-                : 'border-gray-300 dark:border-gray-600 hover:border-green-500'
+                ? 'bg-gradient-to-r from-green-500 to-emerald-500 border-green-400 text-white shadow-lg shadow-green-500/30' 
+                : 'border-gray-400/50 dark:border-gray-500/50 hover:border-green-400 glass'
               }
             `}
           >
@@ -452,7 +448,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
                   ref={titleInputRef}
                   type="text"
                   defaultValue={node.title}
-                  className={`w-full bg-transparent border-none outline-none font-semibold text-lg ${getTextColorClass(node.formatting.textColor)}`}
+                  className={`w-full bg-transparent border-none outline-none font-bold text-lg ${getTextColorClass(node.formatting.textColor)} placeholder-gray-400/70`}
                   onBlur={(e) => handleTitleSubmit(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -466,7 +462,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
                 />
             ) : (
               <div
-                className={`${getTextColorClass(node.formatting.textColor)} break-words cursor-text font-semibold text-lg mb-2`}
+                className={`${getTextColorClass(node.formatting.textColor)} break-words cursor-text font-bold text-lg mb-2 drop-shadow-sm`}
                 style={getTextStyle()}
                 onDoubleClick={() => !isHandTool && setIsEditingTitle(true)}
                 onTouchEnd={() => !isHandTool && setIsEditingTitle(true)}
@@ -476,12 +472,12 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
             )}
             
 
-<div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-gray-50 dark:bg-gray-700/30">
+<div className="border-2 border-dashed border-white/30 dark:border-gray-400/30 rounded-xl p-3 glass">
   {isEditingDescription ? (
     <textarea
       ref={descriptionInputRef}
       defaultValue={node.description}
-      className={`w-full bg-transparent border-none outline-none resize-none text-sm ${getTextColorClass(node.formatting.textColor)} opacity-80`}
+      className={`w-full bg-transparent border-none outline-none resize-none text-sm ${getTextColorClass(node.formatting.textColor)} opacity-90 placeholder-gray-400/70`}
       rows={4}
       placeholder="Click to edit description..."
       onBlur={(e) => handleDescriptionSubmit(e.target.value)}
@@ -498,7 +494,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
     />
   ) : (
     <div
-      className={`${getTextColorClass(node.formatting.textColor)} break-words cursor-text text-sm opacity-80 leading-relaxed whitespace-pre-wrap`}
+      className={`${getTextColorClass(node.formatting.textColor)} break-words cursor-text text-sm opacity-90 leading-relaxed whitespace-pre-wrap drop-shadow-sm`}
       onDoubleClick={() => !isHandTool && setIsEditingDescription(true)}
       onTouchEnd={() => !isHandTool && setIsEditingDescription(true)}
     >
@@ -517,7 +513,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
               e.stopPropagation();
               onNodeDelete(node.id);
             }}
-            className="flex-shrink-0 w-5 h-5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 transition-colors flex items-center justify-center"
+            className="flex-shrink-0 w-5 h-5 rounded-full glass hover:bg-red-100/50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 transition-all duration-300 flex items-center justify-center hover:scale-110"
           >
             <X className="w-3 h-3" />
           </button>
