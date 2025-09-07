@@ -39,43 +39,68 @@ html, body {
 }
 
 /* Glassmorphism utilities */
-.glass {
+.theme-modern .glass {
   background: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
-.dark .glass {
+.theme-modern.dark .glass {
   background: rgba(17, 25, 40, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
-.glass-strong {
+.theme-modern .glass-strong {
   background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(40px);
   border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
 
-.dark .glass-strong {
+.theme-modern.dark .glass-strong {
   background: rgba(17, 25, 40, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
 }
 
+/* Classic theme styles */
+.theme-classic .glass,
+.theme-classic .glass-strong {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: none;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.theme-classic.dark .glass,
+.theme-classic.dark .glass-strong {
+  background: rgba(31, 41, 55, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
 /* Animated gradient backgrounds */
-.gradient-bg-light {
+.theme-modern .gradient-bg-light {
   background: linear-gradient(135deg, #b9e0ff 0%, #d9f0ff 50%, #b9e0ff 100%);
   background-size: 400% 400%;
   animation: gradientShift 15s ease infinite;
 }
 
-.gradient-bg-dark {
+.theme-modern .gradient-bg-dark {
   background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #1e293b 100%);
   background-size: 400% 400%;
   animation: gradientShift 15s ease infinite;
+}
+
+/* Classic theme backgrounds */
+.theme-classic .gradient-bg-light {
+  background: #f9fafb;
+}
+
+.theme-classic .gradient-bg-dark {
+  background: #111827;
 }
 
 @keyframes gradientShift {
@@ -85,7 +110,7 @@ html, body {
 }
 
 /* Blurred decoration elements */
-.blur-decoration {
+.theme-modern .blur-decoration {
   position: absolute;
   border-radius: 50%;
   filter: blur(120px);
@@ -95,35 +120,54 @@ html, body {
   transition: opacity 0.5s ease;
 }
 
-.dark .blur-decoration {
+.theme-modern.dark .blur-decoration {
   opacity: 0.3;
 }
 
+/* Hide blur decorations in classic theme */
+.theme-classic .blur-decoration {
+  display: none;
+}
+
 /* Enhanced node styling */
-.node-glass {
+.theme-modern .node-glass {
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
-.dark .node-glass {
+.theme-modern.dark .node-glass {
   background: rgba(17, 25, 40, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
-.node-glass:hover {
+.theme-modern .node-glass:hover {
   background: rgba(255, 255, 255, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.4);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
   transform: translateY(-2px);
 }
 
-.dark .node-glass:hover {
+.theme-modern.dark .node-glass:hover {
   background: rgba(17, 25, 40, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* Classic theme node styling */
+.theme-classic .node-glass {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: none;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.theme-classic.dark .node-glass {
+  background: rgba(31, 41, 55, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 /* Document Viewer Animations */

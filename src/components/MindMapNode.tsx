@@ -5,6 +5,7 @@ import { MediaPlayer } from './MediaPlayer';
 import { useFilePaths } from '../hooks/useFilePaths';
 import { InlineVideoPlayer } from './InlineVideoPlayer';
 import { VideoThumbnail } from './VideoThumbnail';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface MindMapNodeProps {
   node: NodeType;
@@ -36,6 +37,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
   zoom,
 }) => {
   const { openFile, openBase64File, getFilePath } = useFilePaths();
+  const { themeStyle } = useTheme();
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -391,10 +393,10 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
           ${inlinePlayerMedia ? 'min-w-80 max-w-[500px]' : 'min-w-64 max-w-96'} 
           p-4 rounded-2xl transition-all duration-300 pointer-events-auto relative
           ${isSelected 
-            ? 'node-glass border-2 border-blue-400/50 shadow-lg shadow-blue-500/20' 
+            ? `${themeStyle === 'modern' ? 'node-glass' : 'bg-white dark:bg-gray-800 shadow-lg'} border-2 border-blue-400/50 shadow-lg shadow-blue-500/20` 
             : isMultiSelected
-            ? 'node-glass border-2 border-green-400/50 shadow-lg shadow-green-500/20'
-            : 'node-glass hover:scale-[1.02]'
+            ? `${themeStyle === 'modern' ? 'node-glass' : 'bg-white dark:bg-gray-800 shadow-lg'} border-2 border-green-400/50 shadow-lg shadow-green-500/20`
+            : `${themeStyle === 'modern' ? 'node-glass hover:scale-[1.02]' : 'bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl border border-gray-200 dark:border-gray-700'}`
           }
           ${node.completed 
             ? 'bg-gradient-to-br from-green-100/80 to-emerald-100/80 dark:from-green-900/40 dark:to-emerald-900/40' 
@@ -435,7 +437,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
               flex-shrink-0 w-5 h-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center hover:scale-110
               ${node.completed 
                 ? 'bg-gradient-to-r from-green-500 to-emerald-500 border-green-400 text-white shadow-lg shadow-green-500/30' 
-                : 'border-gray-400/50 dark:border-gray-500/50 hover:border-green-400 glass'
+                : `border-gray-400/50 dark:border-gray-500/50 hover:border-green-400 ${themeStyle === 'modern' ? 'glass' : 'bg-gray-50 dark:bg-gray-700'}`
               }
             `}
           >
@@ -472,7 +474,11 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
             )}
             
 
-<div className="border-2 border-dashed border-white/30 dark:border-gray-400/30 rounded-xl p-3 glass">
+<div className={`border-2 border-dashed rounded-xl p-3 ${
+              themeStyle === 'modern' 
+                ? 'border-white/30 dark:border-gray-400/30 glass' 
+                : 'border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50'
+            }`}>
   {isEditingDescription ? (
     <textarea
       ref={descriptionInputRef}
@@ -513,7 +519,9 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
               e.stopPropagation();
               onNodeDelete(node.id);
             }}
-            className="flex-shrink-0 w-5 h-5 rounded-full glass hover:bg-red-100/50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 transition-all duration-300 flex items-center justify-center hover:scale-110"
+            className={`flex-shrink-0 w-5 h-5 rounded-full hover:bg-red-100/50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 transition-all duration-300 flex items-center justify-center hover:scale-110 ${
+              themeStyle === 'modern' ? 'glass' : 'bg-gray-100 dark:bg-gray-700'
+            }`}
           >
             <X className="w-3 h-3" />
           </button>

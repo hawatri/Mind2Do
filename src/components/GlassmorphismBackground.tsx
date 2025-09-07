@@ -2,7 +2,16 @@ import React from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
 export const GlassmorphismBackground: React.FC = () => {
-  const { isDarkMode } = useTheme();
+  const { isDarkMode, themeStyle } = useTheme();
+
+  // Only render glassmorphism background for modern theme
+  if (themeStyle !== 'modern') {
+    return (
+      <div className={`fixed inset-0 transition-all duration-500 ${
+        isDarkMode ? 'bg-gray-900' : 'bg-gray-50'
+      }`} />
+    );
+  }
 
   return (
     <>

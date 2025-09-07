@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Download, Upload, Save } from 'lucide-react';
 import { MindMapData, MindMapNode } from '../types';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface FileOperationsProps {
   nodes: MindMapNode[];
@@ -13,6 +14,7 @@ export const FileOperations: React.FC<FileOperationsProps> = ({
   onLoadMindMap,
   onSave,
 }) => {
+  const { themeStyle } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDownload = () => {
@@ -69,7 +71,11 @@ export const FileOperations: React.FC<FileOperationsProps> = ({
     <div className="fixed top-6 left-6 flex gap-3 z-50">
       <button
         onClick={onSave}
-        className="p-3 rounded-xl glass hover:glass-strong transition-all duration-300 text-green-600 hover:text-green-700 hover:scale-105 hover:rotate-3"
+        className={`p-3 rounded-xl transition-all duration-300 text-green-600 hover:text-green-700 hover:scale-105 hover:rotate-3 ${
+          themeStyle === 'modern' 
+            ? 'glass hover:glass-strong' 
+            : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 shadow-lg border border-gray-200 dark:border-gray-700'
+        }`}
         title="Save to browser storage"
       >
         <Save className="w-5 h-5" />
@@ -77,7 +83,11 @@ export const FileOperations: React.FC<FileOperationsProps> = ({
       
       <button
         onClick={handleDownload}
-        className="p-3 rounded-xl glass hover:glass-strong transition-all duration-300 text-blue-600 hover:text-blue-700 hover:scale-105 hover:rotate-3"
+        className={`p-3 rounded-xl transition-all duration-300 text-blue-600 hover:text-blue-700 hover:scale-105 hover:rotate-3 ${
+          themeStyle === 'modern' 
+            ? 'glass hover:glass-strong' 
+            : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 shadow-lg border border-gray-200 dark:border-gray-700'
+        }`}
         title="Download mindmap"
       >
         <Download className="w-5 h-5" />
@@ -85,7 +95,11 @@ export const FileOperations: React.FC<FileOperationsProps> = ({
       
       <button
         onClick={handleUpload}
-        className="p-3 rounded-xl glass hover:glass-strong transition-all duration-300 text-purple-600 hover:text-purple-700 hover:scale-105 hover:rotate-3"
+        className={`p-3 rounded-xl transition-all duration-300 text-purple-600 hover:text-purple-700 hover:scale-105 hover:rotate-3 ${
+          themeStyle === 'modern' 
+            ? 'glass hover:glass-strong' 
+            : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 shadow-lg border border-gray-200 dark:border-gray-700'
+        }`}
         title="Upload mindmap"
       >
         <Upload className="w-5 h-5" />

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Bold, Italic, Underline, Strikethrough, Palette, Type, Image, FileText, Link } from 'lucide-react';
 import { HighlightColor, TextColor } from '../types';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface FormattingToolbarProps {
   selectedNodeId: string | null;
@@ -26,6 +27,7 @@ export const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   onAddMedia,
   currentFormatting,
 }) => {
+  const { themeStyle } = useTheme();
   const [showColorPicker, setShowColorPicker] = React.useState(false);
   const [showTextColorPicker, setShowTextColorPicker] = React.useState(false);
 
@@ -51,7 +53,11 @@ export const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   if (!selectedNodeId) return null;
 
   return (
-    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 glass-strong rounded-2xl p-2 sm:p-3 flex items-center gap-1 sm:gap-2 z-50 max-w-[calc(100vw-2rem)] hover:scale-105 transition-all duration-300">
+    <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 rounded-2xl p-2 sm:p-3 flex items-center gap-1 sm:gap-2 z-50 max-w-[calc(100vw-2rem)] hover:scale-105 transition-all duration-300 ${
+      themeStyle === 'modern' 
+        ? 'glass-strong' 
+        : 'bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700'
+    }`}>
       <button
         onClick={() => onFormatText('bold')}
         onTouchEnd={() => onFormatText('bold')}
@@ -109,7 +115,11 @@ export const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
         </button>
         
         {showColorPicker && (
-          <div className="absolute top-10 left-0 glass-strong rounded-xl p-2 flex gap-1 shadow-xl">
+          <div className={`absolute top-10 left-0 rounded-xl p-2 flex gap-1 shadow-xl ${
+            themeStyle === 'modern' 
+              ? 'glass-strong' 
+              : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
+          }`}>
             {highlightColors.map(({ color, label, bgClass }) => (
               <button
                 key={color}
@@ -135,7 +145,11 @@ export const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
         </button>
         
         {showTextColorPicker && (
-          <div className="absolute top-10 left-0 glass-strong rounded-xl p-2 flex gap-1 shadow-xl">
+          <div className={`absolute top-10 left-0 rounded-xl p-2 flex gap-1 shadow-xl ${
+            themeStyle === 'modern' 
+              ? 'glass-strong' 
+              : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
+          }`}>
             {textColors.map(({ color, label, colorClass }) => (
               <button
                 key={color}
