@@ -4,6 +4,8 @@ export interface MindMapNode {
   description: string;
   x: number;
   y: number;
+  width?: number; // Node width for resizing
+  height?: number; // Node height for resizing
   completed: boolean;
   parentId: string | null;
   children: string[];
@@ -28,6 +30,9 @@ export interface MindMapNode {
     strikethrough: boolean;
     highlight: string;
     textColor: string;
+    fontSize: 'small' | 'medium' | 'large' | 'xlarge';
+    fontFamily: 'default' | 'serif' | 'monospace' | 'cursive';
+    textAlign: 'left' | 'center' | 'right' | 'justify';
   };
 }
 

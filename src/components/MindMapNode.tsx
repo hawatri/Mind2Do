@@ -16,6 +16,7 @@ interface MindMapNodeProps {
   onNodeDelete: (id: string) => void;
   onNodeCreate: (parentId: string, x: number, y: number) => void;
   onNodeMove: (id: string, x: number, y: number) => void;
+  onNodeResize: (id: string, width: number, height: number) => void;
   onRemoveMedia: (nodeId: string, mediaId: string) => void;
   isHandTool: boolean;
   zoom: number;
@@ -31,6 +32,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
   onNodeDelete,
   onNodeCreate,
   onNodeMove,
+  onNodeResize,
   onRemoveMedia,
   isHandTool,
   zoom,
@@ -40,10 +42,15 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [selectedMediaForPlayer, setSelectedMediaForPlayer] = useState<any>(null);
+  const [editingTextElement, setEditingTextElement] = useState<{ type: 'title' | 'description', wordIndex: number } | null>(null);
   const nodeRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
+  const inlineInputRef = useRef<HTMLInputElement>(null);
 
   const [expandedMedia, setExpandedMedia] = useState<string | null>(null);
   const [inlinePlayerMedia, setInlinePlayerMedia] = useState<any>(null);
@@ -61,6 +68,13 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
       descriptionInputRef.current.select();
     }
   }, [isEditingDescription]);
+
+  useEffect(() => {
+    if (editingTextElement && inlineInputRef.current) {
+      inlineInputRef.current.focus();
+      inlineInputRef.current.select();
+    }
+  }, [editingTextElement]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (isHandTool) {
@@ -138,6 +152,52 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
     setIsDragging(false);
   };
 
+  // Resize handlers
+  const handleResizeStart = (e: React.MouseEvent, handle: string) => {
+    if (isHandTool) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    setResizeHandle(handle);
+    setResizeStart({
+      x: e.clientX,
+      y: e.clientY,
+      width: node.width || 256,
+      height: node.height || 200
+    });
+  };
+
+  const handleResizeMove = (e: MouseEvent) => {
+    if (!isResizing || !resizeHandle) return;
+    
+    const deltaX = e.clientX - resizeStart.x;
+    const deltaY = e.clientY - resizeStart.y;
+    
+    let newWidth = resizeStart.width;
+    let newHeight = resizeStart.height;
+    
+    // Calculate new dimensions based on resize handle
+    if (resizeHandle.includes('right')) {
+      newWidth = Math.max(200, resizeStart.width + deltaX);
+    }
+    if (resizeHandle.includes('left')) {
+      newWidth = Math.max(200, resizeStart.width - deltaX);
+    }
+    if (resizeHandle.includes('bottom')) {
+      newHeight = Math.max(150, resizeStart.height + deltaY);
+    }
+    if (resizeHandle.includes('top')) {
+      newHeight = Math.max(150, resizeStart.height - deltaY);
+    }
+    
+    onNodeResize(node.id, newWidth, newHeight);
+  };
+
+  const handleResizeEnd = () => {
+    setIsResizing(false);
+    setResizeHandle(null);
+  };
+
   useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
@@ -153,6 +213,17 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
     }
   }, [isDragging, dragOffset]);
 
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMove);
+      document.addEventListener('mouseup', handleResizeEnd);
+      return () => {
+        document.removeEventListener('mousemove', handleResizeMove);
+        document.removeEventListener('mouseup', handleResizeEnd);
+      };
+    }
+  }, [isResizing, resizeHandle, resizeStart]);
+
   const handleTitleSubmit = (title: string) => {
     if (title.trim()) {
       onNodeUpdate(node.id, { title: title.trim() });
@@ -163,6 +234,77 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
   const handleDescriptionSubmit = (description: string) => {
     onNodeUpdate(node.id, { description: description.trim() || 'Click to edit description' });
     setIsEditingDescription(false);
+  };
+
+  // Inline text editing handlers
+  const handleWordClick = (e: React.MouseEvent, type: 'title' | 'description', wordIndex: number) => {
+    if (isHandTool) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingTextElement({ type, wordIndex });
+  };
+
+  const handleInlineTextSubmit = (newText: string) => {
+    if (!editingTextElement) return;
+    
+    const { type, wordIndex } = editingTextElement;
+    const currentText = type === 'title' ? node.title : node.description;
+    const words = currentText.split(' ');
+    
+    if (wordIndex >= 0 && wordIndex < words.length) {
+      words[wordIndex] = newText;
+      const updatedText = words.join(' ');
+      
+      if (type === 'title') {
+        onNodeUpdate(node.id, { title: updatedText });
+      } else {
+        onNodeUpdate(node.id, { description: updatedText });
+      }
+    }
+    
+    setEditingTextElement(null);
+  };
+
+  const renderTextWithInlineEditing = (text: string, type: 'title' | 'description') => {
+    const words = text.split(' ');
+    
+    return words.map((word, index) => {
+      const isEditing = editingTextElement?.type === type && editingTextElement?.wordIndex === index;
+      
+      if (isEditing) {
+        return (
+          <input
+            key={index}
+            ref={inlineInputRef}
+            type="text"
+            defaultValue={word}
+            className="inline bg-transparent border-b-2 border-blue-500 outline-none min-w-0"
+            style={{ width: `${Math.max(word.length * 8, 20)}px` }}
+            onBlur={(e) => handleInlineTextSubmit(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleInlineTextSubmit((e.target as HTMLInputElement).value);
+              } else if (e.key === 'Escape') {
+                setEditingTextElement(null);
+              }
+            }}
+            onClick={(e) => e.stopPropagation()}
+            autoFocus
+          />
+        );
+      }
+      
+      return (
+        <span
+          key={index}
+          className="cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded px-1 transition-colors"
+          onClick={(e) => handleWordClick(e, type, index)}
+          title="Click to edit this word"
+        >
+          {word}
+        </span>
+      );
+    });
   };
 
   const getHighlightClass = (highlight: string) => {
@@ -195,6 +337,34 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
       fontStyle: formatting.italic ? 'italic' : 'normal',
       textDecoration: `${formatting.underline ? 'underline' : ''} ${formatting.strikethrough ? 'line-through' : ''}`.trim() || 'none',
     };
+  };
+
+  const getFontSizeClass = (fontSize: string) => {
+    switch (fontSize) {
+      case 'small': return 'text-xs';
+      case 'medium': return 'text-sm';
+      case 'large': return 'text-lg';
+      case 'xlarge': return 'text-xl';
+      default: return 'text-sm';
+    }
+  };
+
+  const getFontFamilyClass = (fontFamily: string) => {
+    switch (fontFamily) {
+      case 'serif': return 'font-serif';
+      case 'monospace': return 'font-mono';
+      case 'cursive': return 'font-cursive';
+      default: return 'font-sans';
+    }
+  };
+
+  const getTextAlignClass = (textAlign: string) => {
+    switch (textAlign) {
+      case 'center': return 'text-center';
+      case 'right': return 'text-right';
+      case 'justify': return 'text-justify';
+      default: return 'text-left';
+    }
   };
 
   const handleOpenMedia = async (media: any) => {
@@ -388,7 +558,6 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
     >
       <div
         className={`
-          ${inlinePlayerMedia ? 'min-w-80 max-w-[500px]' : 'min-w-64 max-w-96'} 
           p-4 rounded-lg shadow-lg border-2 transition-all duration-300 pointer-events-auto
           ${isSelected 
             ? 'border-blue-500 shadow-blue-100 dark:shadow-blue-900/50' 
@@ -403,6 +572,16 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
           ${getHighlightClass(node.formatting.highlight)}
           relative
         `}
+        style={{
+          width: node.width || 256,
+          height: node.height || 200,
+          minWidth: 200,
+          minHeight: 150,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+        }}
         onClick={(e) => {
           e.stopPropagation();
           if (isHandTool) {
@@ -425,7 +604,9 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
         {/* Background overlay to hide connection lines */}
         <div className="absolute inset-0 bg-white dark:bg-gray-800 rounded-lg -z-10"></div>
         
-        <div className="flex items-start gap-3 mb-3">
+        {/* Scrollable content area */}
+        <div className="flex-1 min-h-0 overflow-y-auto node-content-scroll p-1">
+          <div className="flex items-start gap-3 mb-3 flex-shrink-0">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -446,7 +627,7 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
             {node.completed && <Check className="w-3 h-3" />}
           </button>
           
-          <div className="flex-1 node-handle">
+          <div className="flex-1 node-handle min-w-0">
             {isEditingTitle ? (
                               <input
                   ref={titleInputRef}
@@ -466,17 +647,17 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
                 />
             ) : (
               <div
-                className={`${getTextColorClass(node.formatting.textColor)} break-words cursor-text font-semibold text-lg mb-2`}
+                className={`${getTextColorClass(node.formatting.textColor)} ${getFontSizeClass(node.formatting.fontSize)} ${getFontFamilyClass(node.formatting.fontFamily)} ${getTextAlignClass(node.formatting.textAlign)} break-words cursor-text font-semibold mb-2`}
                 style={getTextStyle()}
                 onDoubleClick={() => !isHandTool && setIsEditingTitle(true)}
                 onTouchEnd={() => !isHandTool && setIsEditingTitle(true)}
               >
-                {node.title}
+                {renderTextWithInlineEditing(node.title, 'title')}
               </div>
             )}
             
 
-<div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-gray-50 dark:bg-gray-700/30">
+<div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-gray-50 dark:bg-gray-700/30 flex-1 min-h-0 overflow-hidden">
   {isEditingDescription ? (
     <textarea
       ref={descriptionInputRef}
@@ -498,11 +679,11 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
     />
   ) : (
     <div
-      className={`${getTextColorClass(node.formatting.textColor)} break-words cursor-text text-sm opacity-80 leading-relaxed whitespace-pre-wrap`}
+      className={`${getTextColorClass(node.formatting.textColor)} ${getFontSizeClass(node.formatting.fontSize)} ${getFontFamilyClass(node.formatting.fontFamily)} ${getTextAlignClass(node.formatting.textAlign)} break-words cursor-text opacity-80 leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-full node-content-scroll`}
       onDoubleClick={() => !isHandTool && setIsEditingDescription(true)}
       onTouchEnd={() => !isHandTool && setIsEditingDescription(true)}
     >
-      {node.description}
+      {renderTextWithInlineEditing(node.description, 'description')}
     </div>
   )}
 </div>
@@ -523,147 +704,150 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
           </button>
         </div>
         
-        {node.media.length > 0 && (
-  <div className="mb-3 space-y-2">
-    {node.media.map((media) => (
-      <div key={media.id} className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
-        {/* Media Header */}
-        <div className="p-2 bg-gray-50 dark:bg-gray-700">
-          <div className="flex items-center gap-2">
-            {getMediaIcon(media)}
-            <span className="text-sm text-gray-700 dark:text-gray-300 truncate flex-1">
-              {media.name}
-            </span>
-            
-            {/* Play button for video/audio links */}
-            {media.type === 'link' && (media.linkType === 'youtube' || media.linkType === 'video' || media.linkType === 'audio') && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (inlinePlayerMedia?.id === media.id) {
-                    setInlinePlayerMedia(null);
-                  } else {
-                    setInlinePlayerMedia(media);
-                  }
-                }}
-                onTouchEnd={(e) => {
-                  e.stopPropagation();
-                  if (inlinePlayerMedia?.id === media.id) {
-                    setInlinePlayerMedia(null);
-                  } else {
-                    setInlinePlayerMedia(media);
-                  }
-                }}
-                className={`text-gray-500 hover:text-green-600 dark:hover:text-green-400 transition-colors ${
-                  inlinePlayerMedia?.id === media.id ? 'text-green-600 dark:text-green-400' : ''
-                }`}
-                title="Play inline"
-              >
-                <Play className="w-3 h-3" />
-              </button>
-            )}
-            
-            {/* Remove button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemoveMedia(node.id, media.id);
-              }}
-              onTouchEnd={(e) => {
-                e.stopPropagation();
-                onRemoveMedia(node.id, media.id);
-              }}
-              className="text-gray-500 hover:text-red-500"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
+          {node.media.length > 0 && (
+            <div className="mb-3 space-y-2 flex-shrink-0 overflow-hidden">
+              {node.media.map((media) => (
+                <div key={media.id} className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden max-w-full">
+                  {/* Media Header */}
+                  <div className="p-2 bg-gray-50 dark:bg-gray-700">
+                    <div className="flex items-center gap-2">
+                      {getMediaIcon(media)}
+                      <span className="text-sm text-gray-700 dark:text-gray-300 truncate flex-1 min-w-0">
+                        {media.name}
+                      </span>
+                      
+                      {/* Play button for video/audio links */}
+                      {media.type === 'link' && (media.linkType === 'youtube' || media.linkType === 'video' || media.linkType === 'audio') && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (inlinePlayerMedia?.id === media.id) {
+                              setInlinePlayerMedia(null);
+                            } else {
+                              setInlinePlayerMedia(media);
+                            }
+                          }}
+                          onTouchEnd={(e) => {
+                            e.stopPropagation();
+                            if (inlinePlayerMedia?.id === media.id) {
+                              setInlinePlayerMedia(null);
+                            } else {
+                              setInlinePlayerMedia(media);
+                            }
+                          }}
+                          className={`text-gray-500 hover:text-green-600 dark:hover:text-green-400 transition-colors ${
+                            inlinePlayerMedia?.id === media.id ? 'text-green-600 dark:text-green-400' : ''
+                          }`}
+                          title="Play inline"
+                        >
+                          <Play className="w-3 h-3" />
+                        </button>
+                      )}
+                      
+                      {/* Remove button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveMedia(node.id, media.id);
+                        }}
+                        onTouchEnd={(e) => {
+                          e.stopPropagation();
+                          onRemoveMedia(node.id, media.id);
+                        }}
+                        className="text-gray-500 hover:text-red-500"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Video Thumbnail (for link media) */}
+                  {media.type === 'link' && !inlinePlayerMedia && (
+                    <div className="p-3">
+                      <VideoThumbnail
+                        media={media}
+                        onPlay={() => setInlinePlayerMedia(media)}
+                        onExternalLink={() => {
+                          if (media.type === 'link') {
+                            window.open(media.url, '_blank');
+                          } else {
+                            handleMediaClick(media);
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Inline Video Player */}
+                  {inlinePlayerMedia?.id === media.id && media.type === 'link' && (
+                    <InlineVideoPlayer
+                      media={media}
+                      onClose={() => setInlinePlayerMedia(null)}
+                      onFullscreen={() => {
+                        setSelectedMediaForPlayer(media);
+                        setInlinePlayerMedia(null);
+                      }}
+                    />
+                  )}
+                  
+                  {/* Image preview */}
+                  {media.type === 'image' && (
+                    <div className="p-2">
+                      <img
+                        src={media.url}
+                        alt={media.name}
+                        className="w-full h-auto rounded max-h-32 object-cover cursor-pointer hover:opacity-90 transition-all duration-300"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMediaClick(media);
+                        }}
+                        onTouchEnd={(e) => {
+                          e.stopPropagation();
+                          handleMediaClick(media);
+                        }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Document preview */}
+                  {media.type === 'document' && (
+                    <div className="p-2">
+                      <div className="bg-gray-100 dark:bg-gray-700 rounded p-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMediaClick(media);
+                        }}
+                        onTouchEnd={(e) => {
+                          e.stopPropagation();
+                          handleMediaClick(media);
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-8 h-8 text-blue-500" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {media.name}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Click to open document
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         
-        {/* Video Thumbnail (for link media) */}
-        {media.type === 'link' && !inlinePlayerMedia && (
-          <div className="p-3">
-            <VideoThumbnail
-              media={media}
-              onPlay={() => setInlinePlayerMedia(media)}
-              onExternalLink={() => {
-                if (media.type === 'link') {
-                  window.open(media.url, '_blank');
-                } else {
-                  handleMediaClick(media);
-                }
-              }}
-            />
-          </div>
-        )}
-        
-        {/* Inline Video Player */}
-        {inlinePlayerMedia?.id === media.id && media.type === 'link' && (
-          <InlineVideoPlayer
-            media={media}
-            onClose={() => setInlinePlayerMedia(null)}
-            onFullscreen={() => {
-              setSelectedMediaForPlayer(media);
-              setInlinePlayerMedia(null);
-            }}
-          />
-        )}
-        
-        {/* Image preview */}
-        {media.type === 'image' && (
-          <div className="p-2">
-            <img
-              src={media.url}
-              alt={media.name}
-              className="w-full h-auto rounded max-h-32 object-cover cursor-pointer hover:opacity-90 transition-all duration-300"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleMediaClick(media);
-              }}
-              onTouchEnd={(e) => {
-                e.stopPropagation();
-                handleMediaClick(media);
-              }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          </div>
-        )}
-        
-        {/* Document preview */}
-        {media.type === 'document' && (
-          <div className="p-2">
-            <div className="bg-gray-100 dark:bg-gray-700 rounded p-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleMediaClick(media);
-              }}
-              onTouchEnd={(e) => {
-                e.stopPropagation();
-                handleMediaClick(media);
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <FileText className="w-8 h-8 text-blue-500" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {media.name}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Click to open document
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    ))}
-  </div>
-)}
-        <div className="flex flex-row items-center gap-2 mt-3">
- <button style={{ minWidth: '120px' }}
+        {/* Fixed buttons at the bottom */}
+        <div className="flex flex-row items-center gap-2 flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-3">
+ <button
  onClick={(e) => {
  e.stopPropagation();
             const event = new Event('mind2do-open-chat');
@@ -674,12 +858,12 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
             const event = new Event('mind2do-open-chat');
             window.dispatchEvent(event);
  }}
- className={`flex-1 py-2 rounded border-2 border-dashed border-gray-400 dark:border-gray-600 hover:border-blue-500 text-gray-700 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center gap-2 font-medium text-nowrap ${
+ className={`flex-1 py-2 rounded border-2 border-dashed border-gray-400 dark:border-gray-600 hover:border-blue-500 text-gray-700 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center gap-1 font-medium min-w-0 ${
  isHandTool ? 'pointer-events-none opacity-50' : ''
  }`}
  >
- <FileText className="w-3 h-3" /> {/* Using FileText icon for now */}
- <span className="text-sm font-semibold">AI Suggestion</span>
+ <FileText className="w-3 h-3 flex-shrink-0" />
+ <span className="text-xs font-semibold truncate">AI Suggestion</span>
  </button>
 
         <button
@@ -695,14 +879,63 @@ export const MindMapNode: React.FC<MindMapNodeProps> = ({
               onNodeCreate(node.id, node.x + 250, node.y + 100);
             }
           }}
-className={`flex-1 py-2 rounded border-2 border-dashed border-gray-400 dark:border-gray-600 hover:border-blue-500 text-gray-700 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center gap-2 font-medium ${
+className={`flex-1 py-2 rounded border-2 border-dashed border-gray-400 dark:border-gray-600 hover:border-blue-500 text-gray-700 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center justify-center gap-1 font-medium min-w-0 ${
             isHandTool ? 'pointer-events-none opacity-50' : ''
           }`}
         >
-          <Plus className="w-4 h-4" />
-          <span className="text-sm font-semibold">Add Child</span>
+          <Plus className="w-3 h-3 flex-shrink-0" />
+          <span className="text-xs font-semibold truncate">Add Child</span>
         </button>
         </div>
+        
+        {/* Resize handles - only show when selected */}
+        {isSelected && !isHandTool && (
+          <>
+            {/* Corner handles */}
+            <div
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full cursor-nw-resize hover:bg-blue-600 transition-colors"
+              style={{ top: -6, left: -6 }}
+              onMouseDown={(e) => handleResizeStart(e, 'top-left')}
+            />
+            <div
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full cursor-ne-resize hover:bg-blue-600 transition-colors"
+              style={{ top: -6, right: -6 }}
+              onMouseDown={(e) => handleResizeStart(e, 'top-right')}
+            />
+            <div
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full cursor-sw-resize hover:bg-blue-600 transition-colors"
+              style={{ bottom: -6, left: -6 }}
+              onMouseDown={(e) => handleResizeStart(e, 'bottom-left')}
+            />
+            <div
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full cursor-se-resize hover:bg-blue-600 transition-colors"
+              style={{ bottom: -6, right: -6 }}
+              onMouseDown={(e) => handleResizeStart(e, 'bottom-right')}
+            />
+            
+            {/* Edge handles */}
+            <div
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full cursor-n-resize hover:bg-blue-600 transition-colors"
+              style={{ top: -6, left: '50%', transform: 'translateX(-50%)' }}
+              onMouseDown={(e) => handleResizeStart(e, 'top')}
+            />
+            <div
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full cursor-s-resize hover:bg-blue-600 transition-colors"
+              style={{ bottom: -6, left: '50%', transform: 'translateX(-50%)' }}
+              onMouseDown={(e) => handleResizeStart(e, 'bottom')}
+            />
+            <div
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full cursor-w-resize hover:bg-blue-600 transition-colors"
+              style={{ left: -6, top: '50%', transform: 'translateY(-50%)' }}
+              onMouseDown={(e) => handleResizeStart(e, 'left')}
+            />
+            <div
+              className="absolute w-3 h-3 bg-blue-500 border border-white rounded-full cursor-e-resize hover:bg-blue-600 transition-colors"
+              style={{ right: -6, top: '50%', transform: 'translateY(-50%)' }}
+              onMouseDown={(e) => handleResizeStart(e, 'right')}
+            />
+          </>
+        )}
       </div>
       </div>
 

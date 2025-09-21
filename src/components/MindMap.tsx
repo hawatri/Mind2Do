@@ -18,6 +18,8 @@ const createDefaultNode = (): MindMapNode => ({
   description: 'Click to edit description',
   x: 400,
   y: 200,
+  width: 256, // Default width (min-w-64)
+  height: 200, // Default height
   completed: false,
   parentId: null,
   children: [],
@@ -30,6 +32,9 @@ const createDefaultNode = (): MindMapNode => ({
     strikethrough: false,
     highlight: 'none',
     textColor: 'default',
+    fontSize: 'medium',
+    fontFamily: 'default',
+    textAlign: 'left',
   },
 });
 
@@ -377,6 +382,8 @@ export const MindMap: React.FC = () => {
       description: 'Click to edit description',
       x,
       y,
+      width: 256, // Default width
+      height: 200, // Default height
       completed: false,
       parentId,
       children: [],
@@ -389,6 +396,9 @@ export const MindMap: React.FC = () => {
         strikethrough: false,
         highlight: 'none',
         textColor: 'default',
+        fontSize: 'medium',
+        fontFamily: 'default',
+        textAlign: 'left',
       },
     };
     
@@ -404,6 +414,12 @@ export const MindMap: React.FC = () => {
   const handleNodeMove = useCallback((id: string, x: number, y: number) => {
     setNodes(prev => prev.map(node => 
       node.id === id ? { ...node, x, y } : node
+    ));
+  }, []);
+
+  const handleNodeResize = useCallback((id: string, width: number, height: number) => {
+    setNodes(prev => prev.map(node => 
+      node.id === id ? { ...node, width, height } : node
     ));
   }, []);
 
@@ -449,6 +465,54 @@ export const MindMap: React.FC = () => {
             formatting: { 
               ...node.formatting, 
               textColor: color 
+            } 
+          }
+        : node
+    ));
+  }, [selectedNodeId]);
+
+  const handleFontSize = useCallback((size: 'small' | 'medium' | 'large' | 'xlarge') => {
+    if (!selectedNodeId) return;
+    
+    setNodes(prev => prev.map(node => 
+      node.id === selectedNodeId 
+        ? { 
+            ...node, 
+            formatting: { 
+              ...node.formatting, 
+              fontSize: size 
+            } 
+          }
+        : node
+    ));
+  }, [selectedNodeId]);
+
+  const handleFontFamily = useCallback((family: 'default' | 'serif' | 'monospace' | 'cursive') => {
+    if (!selectedNodeId) return;
+    
+    setNodes(prev => prev.map(node => 
+      node.id === selectedNodeId 
+        ? { 
+            ...node, 
+            formatting: { 
+              ...node.formatting, 
+              fontFamily: family 
+            } 
+          }
+        : node
+    ));
+  }, [selectedNodeId]);
+
+  const handleTextAlign = useCallback((align: 'left' | 'center' | 'right' | 'justify') => {
+    if (!selectedNodeId) return;
+    
+    setNodes(prev => prev.map(node => 
+      node.id === selectedNodeId 
+        ? { 
+            ...node, 
+            formatting: { 
+              ...node.formatting, 
+              textAlign: align 
             } 
           }
         : node
@@ -679,6 +743,9 @@ export const MindMap: React.FC = () => {
         onFormatText={handleFormatText}
         onHighlightText={handleHighlightText}
         onTextColor={handleTextColor}
+        onFontSize={handleFontSize}
+        onFontFamily={handleFontFamily}
+        onTextAlign={handleTextAlign}
         onAddMedia={handleAddMedia}
         currentFormatting={selectedNode?.formatting || {
           bold: false,
@@ -687,6 +754,9 @@ export const MindMap: React.FC = () => {
           strikethrough: false,
           highlight: 'none',
           textColor: 'default',
+          fontSize: 'medium',
+          fontFamily: 'default',
+          textAlign: 'left',
         }}
       />
       
@@ -829,6 +899,7 @@ export const MindMap: React.FC = () => {
               onNodeDelete={handleNodeDelete}
               onNodeCreate={handleNodeCreate}
               onNodeMove={handleNodeMove}
+              onNodeResize={handleNodeResize}
               onRemoveMedia={handleRemoveMedia}
               isHandTool={isHandTool}
               zoom={zoom}
@@ -845,6 +916,8 @@ export const MindMap: React.FC = () => {
               description: 'Click to edit description',
               x: 100,
               y: 100,
+              width: 256, // Default width
+              height: 200, // Default height
               completed: false,
               parentId: null,
               children: [],
@@ -870,6 +943,8 @@ export const MindMap: React.FC = () => {
               description: 'Click to edit description',
               x: 100,
               y: 100,
+              width: 256, // Default width
+              height: 200, // Default height
               completed: false,
               parentId: null,
               children: [],

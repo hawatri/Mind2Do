@@ -111,3 +111,27 @@ html, body {
     box-shadow: 0 0 0 10px rgba(59, 130, 246, 0.3);
   }
 }
+
+/* Node content scrolling - allow scrollbars for node content */
+.node-content-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+.node-content-scroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.node-content-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.node-content-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 2px;
+}
+
+.node-content-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.7);
+}

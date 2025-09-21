@@ -456,7 +456,7 @@ Description: ${selectedNode.description}`;
         </div>
 
         {/* Content */}
-        <div className={`flex-1 overflow-y-auto p-3 sm:p-4 transition-all duration-700 ease-out ${
+        <div className={`flex-1 overflow-y-auto p-3 sm:p-4 transition-all duration-700 ease-out node-content-scroll ${
           isOpen ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95'
         }`}>
           {activeTab === 'chat' ? (
@@ -585,14 +585,18 @@ Description: ${selectedNode.description}`;
               }`}
               style={{
                 animationDelay: '200ms',
-                animation: isOpen ? 'slideInFromBottom 0.6s ease-out forwards' : 'none'
+                animation: isOpen ? 'slideInFromBottom 0.6s ease-out forwards' : 'none',
+                maxHeight: '200px',
+                overflow: 'hidden'
               }}>
                 <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2 transform transition-all duration-300 hover:translate-x-1">
                   {selectedNode.title}
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 transform transition-all duration-300 hover:translate-x-1">
-                  {selectedNode.description}
-                </p>
+                <div className="overflow-y-auto max-h-32 node-content-scroll">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 transform transition-all duration-300 hover:translate-x-1 whitespace-pre-wrap">
+                    {selectedNode.description}
+                  </p>
+                </div>
               </div>
 
               {/* Last Opened PDF Quick Access */}
@@ -625,10 +629,10 @@ Description: ${selectedNode.description}`;
               {/* Media Files */}
               {selectedNode.media.length > 0 ? (
                 <div
-                className="space-y-3 media-list"
+                className="space-y-3 media-list node-content-scroll"
                 style={{
                 overflowY: 'auto',
-                                  maxHeight: '700px',
+                                  maxHeight: '600px',
                                   WebkitOverflowScrolling: 'touch',
                 }}>
                   <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3">
