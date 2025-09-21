@@ -13,6 +13,19 @@
 
 Mind2Do is a web-based application that transforms the traditional todo list into an interactive, visual experience. It allows users to create hierarchical mind maps where each node represents a task, idea, or concept that can be connected, formatted, and tracked through completion.
 
+
+## Screenshots
+
+<div align="center">
+  <img src="1.png" alt="Mind2Do Main Interface" width="45%"/>
+  <img src="2.png" alt="Documents View Tab" width="45%"/>
+  <br/>
+  <img src="4.png" alt="Search Features" width="45%"/>
+  <img src="3.png" alt="AI Tools Integration" width="45%"/>
+  <br/>
+</div>
+
+
 ## Why This Project Exists
 
 Traditional todo applications often present tasks as linear lists, which can be limiting when dealing with complex projects that have multiple interconnected components. Mind2Do addresses this limitation by providing a visual, hierarchical approach to task organization.
